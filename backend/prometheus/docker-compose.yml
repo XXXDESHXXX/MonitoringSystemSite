@@ -1,0 +1,20 @@
+version: '3'
+services:
+  prometheus:
+    image: prom/prometheus:v3.2.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./:/etc/prometheus/
+    networks:
+      - monitoring_network
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring_network
+
+networks:
+  monitoring_network:
