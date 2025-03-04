@@ -1,38 +1,78 @@
-.App {
-  text-align: center;
+/* Сброс некоторых базовых отступов и стилей */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.navbar {
+  background-color: #333;
+  padding: 1rem;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.nav-list {
+  list-style: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.nav-item {
+  position: relative;
+  margin-right: 1.5rem;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.nav-item a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1.1rem;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.nav-item a .icon {
+  margin-right: 0.5rem;
+}
+
+.nav-item a:hover {
+  color: #ff9900;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #444;
+  padding: 0.5rem 0;
+  min-width: 150px;
+  border-radius: 4px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+.dropdown-content li {
+  margin: 0;
+  padding: 0;
+}
+
+.dropdown-content li a {
+  display: block;
+  padding: 0.5rem 1rem;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.dropdown-content li a:hover {
+  background-color: #555;
+}
+
+.nav-item:hover .dropdown-content {
+  display: block;
 }
