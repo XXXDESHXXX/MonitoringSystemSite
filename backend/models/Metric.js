@@ -1,10 +1,10 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
+import { DataTypes } from 'sequelize';
+import sequelize from '../db.js';
 
-const Comment = require('./Comment');
-const Trackable = require('./Trackable');
-const Tag = require('./Tag');
-const MetricTag = require('./MetricTag');
+import Comment from './Comment.js';
+import Trackable from './Trackable.js';
+import Tag from './Tag.js';
+import MetricTag from './MetricTag.js';
 
 const Metric = sequelize.define('Metric', {
   id: {
@@ -28,4 +28,4 @@ Trackable.belongsTo(Metric, { foreignKey: 'metric_id' });
 Metric.belongsToMany(Tag, { through: MetricTag, foreignKey: 'metric_id' });
 Tag.belongsToMany(Metric, { through: MetricTag, foreignKey: 'tag_id' });
 
-module.exports = Metric;
+export default Metric;

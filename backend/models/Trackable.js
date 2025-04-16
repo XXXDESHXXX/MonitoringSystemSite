@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
+import { DataTypes } from 'sequelize';
+import sequelize from '../db.js';
 
 const Trackable = sequelize.define('Trackable', {
   id: {
@@ -12,4 +12,4 @@ const Trackable = sequelize.define('Trackable', {
   timestamps: true
 });
 
-module.exports = Trackable;
+export default Trackable;

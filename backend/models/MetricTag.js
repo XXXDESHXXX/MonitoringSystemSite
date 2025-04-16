@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
+import { DataTypes } from 'sequelize';
+import sequelize from '../db.js';
 
 const MetricTag = sequelize.define('MetricTag', {
   id: {
@@ -12,4 +12,4 @@ const MetricTag = sequelize.define('MetricTag', {
   timestamps: true
 });
 
-module.exports = MetricTag;
+export default MetricTag;

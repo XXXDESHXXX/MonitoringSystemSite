@@ -1,9 +1,9 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
+import { DataTypes } from 'sequelize';
+import sequelize from '../db.js';
 
-const Metric = require('./Metric');
-const Comment = require('./Comment');
-const Trackable = require('./Trackable');
+import Metric from './Metric.js';
+import Comment from './Comment.js';
+import Trackable from './Trackable.js';
 
 const User = sequelize.define('User', {
   id: {
@@ -29,4 +29,4 @@ Comment.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(Trackable, { foreignKey: 'user_id' });
 Trackable.belongsTo(User, { foreignKey: 'user_id' });
 
-module.exports = User;
+export default User;

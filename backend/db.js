@@ -1,9 +1,7 @@
-const path = require('path');
-require('dotenv').config({
-  path: path.join(__dirname, '..', '.env'),
-});
+import {Sequelize} from "sequelize";
+import dotenv from "dotenv";
+dotenv.config({path: '../.env'});
 
-const { Sequelize } = require('sequelize');
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -16,4 +14,4 @@ const sequelize = new Sequelize(
   }
 );
 
-module.exports = sequelize;
+export default sequelize;

@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../db');
+import { DataTypes } from 'sequelize';
+import sequelize from '../db.js';
 
 const Tag = sequelize.define('Tag', {
   id: {
@@ -15,4 +15,4 @@ const Tag = sequelize.define('Tag', {
   timestamps: true
 });
 
-module.exports = Tag;
+export default Tag;

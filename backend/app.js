@@ -1,23 +1,26 @@
-// app.js
-require('dotenv').config(); // Чтобы process.env.* были доступны
-const express = require('express');
-const fetch = require('node-fetch');
-const cors = require('cors');
+import {registerAuthRoutes} from "./routes/auth.js";
+import dotenv from "dotenv";
+dotenv.config();
+import express from "express";
+import fetch from "node-fetch";
+import cors from "cors";
+import sequelize from "./db.js";
+
+
 
 const app = express();
 app.use(cors());
 
-// Подключаем наш sequelize-экземпляр:
-const sequelize = require('./db');
+import User from "./models/User.js"
+import Metric from "./models/Metric.js"
+import Comment from "./models/Comment.js"
+import Trackable from "./models/Trackable.js"
+import Tag from "./models/Tag.js"
+import MetricTag from "./models/MetricTag.js"
+import {initializePassport} from "./dependencies.js";
 
-// Подключаем модели, чтобы они «подтянулись» и ассоциации были установлены.
-// Если мы их не заимпортируем, ассоциации не будут зарегистрированы.
-require('./models/User');
-require('./models/Metric');
-require('./models/Comment');
-require('./models/Trackable');
-require('./models/Tag');
-require('./models/MetricTag');
+initializePassport();
+registerAuthRoutes(app);
 
 sequelize.sync({ force: false })
   .then(() => {

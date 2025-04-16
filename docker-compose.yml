@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend/my-app
+      dockerfile: frontend/my-app/Dockerfile
+    container_name: myapp-frontend
+    restart: always
+    ports:
+      - "8081:80"
+    networks:
+      - myapp-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: myapp-backend
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DB_URL}
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    networks:
+      - myapp-network
+
+  db:
+    image: postgres:15
+    container_name: myapp-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - myapp-network
+
+networks:
+  myapp-network:
+
+volumes:
+  db_data:
+
+
