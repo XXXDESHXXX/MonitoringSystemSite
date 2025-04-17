@@ -28,6 +28,22 @@ function initializePassport() {
                 });
         }
     ));
+
+    // Сериализация пользователя в сессию
+    passport.serializeUser((user, cb) => {
+        cb(null, user.id);
+    });
+
+    // Десериализация пользователя из сессии
+    passport.deserializeUser((id, cb) => {
+        User.findByPk(id)
+            .then(user => {
+                cb(null, user);
+            })
+            .catch(err => {
+                cb(err);
+            });
+    });
 }
 
 export { initializePassport, passport };

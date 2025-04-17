@@ -10,6 +10,15 @@ import sequelize from "./db.js";
 
 const app = express();
 app.use(cors());
+app.use(express.json())
+
+
+// Настройка сессий
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false
+}));
 
 import User from "./models/User.js"
 import Metric from "./models/Metric.js"
@@ -17,9 +26,13 @@ import Comment from "./models/Comment.js"
 import Trackable from "./models/Trackable.js"
 import Tag from "./models/Tag.js"
 import MetricTag from "./models/MetricTag.js"
-import {initializePassport} from "./dependencies.js";
+import {initializePassport,passport} from "./dependencies.js";
 
+
+app.use(passport.initialize());
+app.use(passport.session());
 initializePassport();
+
 registerAuthRoutes(app);
 
 sequelize.sync({ force: false })
