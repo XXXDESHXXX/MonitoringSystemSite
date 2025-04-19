@@ -57,7 +57,7 @@ app.get('/metrics/load_average', async (req, res) => {
     name: 'LOAD_AVERAGE'
   }
 });
-  const userTrackableMetric = Trackable.findOne( { where: {user_id: req.user.id, metric_id: metric.id}} )
+  const userTrackableMetric = await Trackable.findOne( { where: {user_id: req.user.id, metric_id: metric.id}} )
   try {
     const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_load1');
     const data = await response.json();
@@ -65,6 +65,7 @@ app.get('/metrics/load_average', async (req, res) => {
     if (data.status === 'success' && data.data.result.length > 0) {
       const loadMetric = data.data.result[0];
       const loadValue = loadMetric.value[1];
+      console.log(userTrackableMetric);
       if (userTrackableMetric != null)
       {
         await MetricValue.create({ value: loadValue, metric_id: metric.id})
