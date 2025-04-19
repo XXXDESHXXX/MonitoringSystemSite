@@ -86,6 +86,43 @@ app.get('/protected', ensureAuthenticated, (req, res) => {
   res.json({ msg: "You are in!", user: req.user.username });
 });
 
+app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = req.params.metric_id;
+    const userId   = req.user.id;
+
+    // 1) Проверяем, что такая метрика есть
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) {
+      return res.status(404).json({ error: 'Metric not found' });
+    }
+
+    // 2) Либо находим, либо создаём Trackable
+    const [trackable, created] = await Trackable.findOrCreate({
+      where: {
+        user_id:   userId,
+        metric_id: metricId
+      },
+      defaults: {
+        user_id:   userId,
+        metric_id: metricId
+      }
+    });
+
+    // 3) Возвращаем ответ
+    return res
+      .status(created ? 201 : 200)
+      .json({
+        message: created
+          ? 'Metric is now being tracked'
+          : 'Metric was already tracked',
+        trackable
+      });
+  } catch (err) {
+    console.error('Error in /metrics/:metric_id/track:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
