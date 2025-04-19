@@ -26,13 +26,13 @@ export default function Login() {
       // Логируем статус ответа
       console.log('Response Status:', res.status);
 
-      if (res.status === 302) {
-        login(); // Вызываем login, если статус 302
-        navigate('/protected'); // Перенаправляем на защищенную страницу
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.message || 'Login failed' });
-      }
+    if (res.ok) { // res.ok = true для всех статусов от 200 до 299
+      login();
+      navigate('/protected');
+    } else {
+      const data = await res.json();
+      setMessage({ type: 'error', text: data.message || 'Login failed' });
+    }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     }
