@@ -76,3 +76,15 @@ body {
 .nav-item:hover .dropdown-content {
   display: block;
 }
+.logout-button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.logout-button:hover {
+  color: #ff9900;
+}

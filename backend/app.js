@@ -1,15 +1,19 @@
-import {registerAuthRoutes} from "./routes/auth.js";
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import sequelize from "./db.js";
+import session from 'express-session';
+import authRouter from "./routes/auth.js";
 
 
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json())
 
 
@@ -33,7 +37,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
 
-registerAuthRoutes(app);
+app.use("/auth", authRouter);
 
 sequelize.sync({ force: false })
   .then(() => {
@@ -60,6 +64,20 @@ app.get('/metrics/load_average', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch data from Prometheus' });
   }
 });
+
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  // здесь можно редиректить на /login или отдавать 401
+  return res.status(401).json({ error: "Not authenticated" });
+}
+
+app.get('/protected', ensureAuthenticated, (req, res) => {
+  // если пользователь залогинен, здесь доступен req.user
+  res.json({ msg: "You are in!", user: req.user.username });
+});
+
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {

@@ -12,7 +12,8 @@ const User = sequelize.define('User', {
     autoIncrement: true
   },
   username: { type: DataTypes.STRING, allowNull: false },
-  password: { type: DataTypes.STRING, allowNull: false },
+  password: { type: DataTypes.BLOB, allowNull: false },
+  salt: { type: DataTypes.STRING, allowNull: false },
   email: { type: DataTypes.STRING },
   role: { type: DataTypes.STRING }
 }, {
