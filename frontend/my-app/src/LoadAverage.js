@@ -13,7 +13,10 @@ function LoadAverage() {
             try {
                 const url = getAbsoluteURL(API_ENDPOINTS.loadAverage);
                 setStatusCode(null);
-                const response = await fetch(url, {method: 'GET'});
+                const response = await fetch(url, {
+                  method: 'GET',
+                  credentials: 'include'  // <-- передать cookie авторизации
+                });
                 setStatusCode(response.statusCode);
                 const json = await response.json();
                 const loadAverageHumanized = (json.load_average * 100).toFixed(2).toString();
