@@ -11,15 +11,29 @@ const User = sequelize.define('User', {
     primaryKey: true,
     autoIncrement: true
   },
-  username: { type: DataTypes.STRING, allowNull: false },
-  password: { type: DataTypes.BLOB, allowNull: false },
-  salt: { type: DataTypes.STRING, allowNull: false },
-  email: { type: DataTypes.STRING },
-  role: { type: DataTypes.STRING }
+  username: {
+    type: DataTypes.STRING(16),  // ограничение на 16 символов
+    allowNull: false
+  },
+  password: {
+    type: DataTypes.BLOB,
+    allowNull: false
+  },
+  salt: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  email: {
+    type: DataTypes.STRING
+  },
+  role: {
+    type: DataTypes.STRING
+  }
 }, {
   tableName: 'Users',
   timestamps: true
 });
+
 
 User.hasMany(Comment, { foreignKey: 'user_id' });
 Comment.belongsTo(User, { foreignKey: 'user_id' });

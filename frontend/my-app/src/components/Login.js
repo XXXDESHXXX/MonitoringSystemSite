@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { getAbsoluteURL } from '../utils/utils';
 import { useNavigate } from 'react-router-dom';
-import { useContext } from 'react';
 import { AuthContext } from '../AuthContext';
 import './Auth.css';
 
@@ -15,6 +14,16 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
+
+    if (username.length > 16) {
+      setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
+      return;
+    }
+    if (password.length < 8 || password.length > 64) {
+      setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
+      return;
+    }
+
     try {
       const res = await fetch(getAbsoluteURL('auth/login'), {
         method: 'POST',
@@ -23,16 +32,15 @@ export default function Login() {
         body: JSON.stringify({ username, password }),
       });
 
-      // Логируем статус ответа
       console.log('Response Status:', res.status);
 
-    if (res.ok) { // res.ok = true для всех статусов от 200 до 299
-      login();
-      navigate('/protected');
-    } else {
-      const data = await res.json();
-      setMessage({ type: 'error', text: data.message || 'Login failed' });
-    }
+      if (res.ok) {
+        login();
+        navigate('/');
+      } else {
+        const data = await res.json();
+        setMessage({ type: 'error', text: data.error || 'Login failed' });
+      }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     }
@@ -49,6 +57,7 @@ export default function Login() {
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
+            maxLength={16}
             required
           />
         </label>
@@ -59,6 +68,8 @@ export default function Login() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            minLength={8}
+            maxLength={64}
             required
           />
         </label>

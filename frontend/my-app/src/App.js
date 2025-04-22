@@ -16,18 +16,6 @@ function About() {
   return <h2>О нас</h2>;
 }
 
-function Memory() {
-  return <h2>Память</h2>;
-}
-function IO() {
-  return <h2>I/O</h2>;
-}
-function CPU() {
-  return <h2>CPU</h2>;
-}
-function Disk() {
-  return <h2>Нагрузка на диски</h2>;
-}
 
 function Navbar() {
   const { isAuthenticated, setIsAuthenticated } = useContext(AuthContext);
@@ -54,12 +42,6 @@ function Navbar() {
             <li className="nav-item"><Link to="/about">О нас</Link></li>
             <li className="nav-item">
               <Link to="/metrics">Метрики</Link>
-              <ul className="dropdown-content">
-                <li><Link to="/metrics/memory">Память</Link></li>
-                <li><Link to="/metrics/io">I/O</Link></li>
-                <li><Link to="/metrics/cpu">CPU</Link></li>
-                <li><Link to="/metrics/disk">Нагрузка на диски</Link></li>
-              </ul>
             </li>
             <li className="nav-item">
               <button onClick={handleLogout} className="logout-button">Выйти</button>
@@ -87,26 +69,6 @@ function App() {
           <Route
             path="/metrics"
             element={<ProtectedRoute><LoadAverage /></ProtectedRoute>}
-          />
-          <Route
-            path="/metrics/memory"
-            element={<ProtectedRoute><Memory /></ProtectedRoute>}
-          />
-          <Route
-            path="/metrics/io"
-            element={<ProtectedRoute><IO /></ProtectedRoute>}
-          />
-          <Route
-            path="/metrics/cpu"
-            element={<ProtectedRoute><CPU /></ProtectedRoute>}
-          />
-          <Route
-            path="/metrics/disk"
-            element={<ProtectedRoute><Disk /></ProtectedRoute>}
-          />
-          <Route
-            path="/protected"
-            element={<ProtectedRoute><h2>Protected content</h2></ProtectedRoute>}
           />
         </Routes>
       </Router>

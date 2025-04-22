@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { getAbsoluteURL } from '../utils/utils';
 import { useNavigate } from 'react-router-dom';
-import { useContext } from 'react';
 import { AuthContext } from '../AuthContext';
 import './Auth.css';
 
 export default function Register() {
-  const { login } = useContext(AuthContext); // если вам нужно автоматически залогинить пользователя после регистрации
+  const { login } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState(null);
@@ -15,6 +14,16 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
+
+    if (username.length > 16) {
+      setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
+      return;
+    }
+    if (password.length < 8 || password.length > 64) {
+      setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
+      return;
+    }
+
     try {
       const res = await fetch(getAbsoluteURL('auth/register'), {
         method: 'POST',
@@ -23,11 +32,11 @@ export default function Register() {
         body: JSON.stringify({ username, password }),
       });
       if (res.status === 201) {
-        login(); // автоматически залогинить пользователя
-        navigate('/protected'); // перенаправление на защищённую страницу
+        login();
+        navigate('/');
       } else {
         const data = await res.json();
-        setMessage({ type: 'error', text: data.message || 'Registration failed' });
+        setMessage({ type: 'error', text: data.error || 'Registration failed' });
       }
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
@@ -45,6 +54,7 @@ export default function Register() {
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
+            maxLength={16}
             required
           />
         </label>
@@ -55,6 +65,8 @@ export default function Register() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            minLength={8}
+            maxLength={64}
             required
           />
         </label>
