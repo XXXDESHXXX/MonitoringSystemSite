@@ -1,5 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../AuthContext';
 import './Auth.css';
@@ -15,6 +16,7 @@ export default function Login() {
     e.preventDefault();
     setMessage(null);
 
+    // Валидация полей
     if (username.length > 16) {
       setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
       return;
@@ -25,10 +27,10 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch(getAbsoluteURL('auth/login'), {
+      const res = await fetch(getAbsoluteURL(API_ENDPOINTS.login), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
@@ -75,9 +77,7 @@ export default function Login() {
         </label>
         <button className="auth-button" type="submit">Войти</button>
       </form>
-      {message && (
-        <div className={`auth-message ${message.type}`}>{message.text}</div>
-      )}
+      {message && <div className={`auth-message ${message.type}`}>{message.text}</div>}
     </div>
   );
 }

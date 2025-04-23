@@ -8,119 +8,125 @@ import session from 'express-session';
 import authRouter from "./routes/auth.js";
 import { ensureAuthenticated } from "./middleware/auth.js";
 
+// Модели
+import Metric from "./models/Metric.js";
+import Trackable from "./models/Trackable.js";
+import MetricValue from "./models/MetricValue.js";
+
 const app = express();
 app.use(cors({
   origin: 'http://localhost:3000',
-  credentials: true
+  credentials: true,
 }));
-app.use(express.json())
+app.use(express.json());
 
-// Настройка сессий
+// Сессии с куки для кросс-доменных запросов
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    sameSite: 'lax',  // разрешаем отправку куки с фронта на порт 5000
+    secure: false,
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 100
+  }
 }));
 
-import User from "./models/User.js"
-import Metric from "./models/Metric.js"
-import Comment from "./models/Comment.js"
-import Trackable from "./models/Trackable.js"
-import Tag from "./models/Tag.js"
-import MetricTag from "./models/MetricTag.js"
-import MetricValue from "./models/MetricValue.js";
+// Passport
 import { initializePassport, passport } from "./dependencies.js";
-
 app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
-
 app.use("/auth", authRouter);
-app.use("/metrics", ensureAuthenticated);  // теперь все /metrics защищены
 
+// Синхронизация БД
 sequelize.sync({ force: true })
-  .then(() => {
-    console.log('DB synced successfully');
-  })
-  .catch(err => {
-    console.error('Error syncing DB:', err);
-  });
+  .then(() => console.log('DB synced successfully'))
+  .catch(err => console.error('Error syncing DB:', err));
 
-// Грузим метрику — с защитой
+// 1) Список всех метрик
+app.get('/metrics', ensureAuthenticated, async (req, res) => {
+  try {
+    // Lazy‐создаём обе метрики при первом обращении к списку
+    await Promise.all([
+      Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' }, defaults: { name: 'LOAD_AVERAGE' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' }, defaults: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' }, defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' } })
+    ]);
+
+    const metrics = await Metric.findAll({ attributes: ['id', 'name'] });
+    res.json(metrics);
+  } catch (err) {
+    console.error('Error fetching metrics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2) LOAD_AVERAGE (как было)
 app.get('/metrics/load_average', ensureAuthenticated, async (req, res) => {
   try {
-    const [metric, created] = await Metric.findOrCreate({
+    const [metric] = await Metric.findOrCreate({
       where: { name: 'LOAD_AVERAGE' },
       defaults: { name: 'LOAD_AVERAGE' }
     });
-
-
-    const userTrackableMetric = await Trackable.findOne({
-      where: {
-        user_id: req.user.id,
-        metric_id: metric.id
-      }
-    });
-
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
     const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_load1');
     const data = await response.json();
-
     if (data.status === 'success' && data.data.result.length > 0) {
-      const loadMetric = data.data.result[0];
-      const loadValue = parseFloat(loadMetric.value[1]);
-
-      if (userTrackableMetric != null) {
-        await MetricValue.create({ value: loadValue, metric_id: metric.id });
-      }
-
-      res.json({ load_average: loadValue });
-    } else {
-      res.status(500).json({ error: 'No data returned from Prometheus' });
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ load_average: val });
     }
-
+    res.status(500).json({ error: 'No data returned from Prometheus' });
   } catch (error) {
-    console.error('Error fetching data from Prometheus:', error);
-    res.status(500).json({ error: 'Failed to fetch data from Prometheus' });
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
-// Трекать метрику
-app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+// 3) NODE_MEMORY_DIRTY_BYTES (новая метрика)
+app.get('/metrics/node_cpu_seconds_total', ensureAuthenticated, async (req, res) => {
   try {
-    const metricId = req.params.metric_id;
-    const userId = req.user.id;
-
-    const metric = await Metric.findByPk(metricId);
-    if (!metric) {
-      return res.status(404).json({ error: 'Metric not found' });
-    }
-
-    const [trackable, created] = await Trackable.findOrCreate({
-      where: {
-        user_id: userId,
-        metric_id: metricId
-      },
-      defaults: {
-        user_id: userId,
-        metric_id: metricId
-      }
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_CPU_SECONDS_TOTAL' },
+      defaults: { name: 'NODE_CPU_SECONDS_TOTAL' }
     });
-
-    return res
-      .status(created ? 201 : 200)
-      .json({
-        message: created
-          ? 'Metric is now being tracked'
-          : 'Metric was already tracked',
-        trackable
-      });
-  } catch (err) {
-    console.error('Error in /metrics/:metric_id/track:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_cpu_seconds_total');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_cpu_seconds_total: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
-const port = process.env.PORT || 5000;
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_MEMORY_MEMFREE_BYTES' },
+      defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_memory_MemFree_bytes');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_memory_MemFree_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
 });
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server on port ${PORT}`));

@@ -2,6 +2,7 @@ import passport from "passport";
 import express from "express";
 import crypto from "crypto";
 import User from "../models/User.js";
+import {ensureAuthenticated} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -16,6 +17,11 @@ router.post('/login', (req, res, next) => {
       return res.json({ message: 'Login successful' });
     });
   })(req, res, next);
+});
+
+
+router.get('/me', ensureAuthenticated, (req, res) => {
+  res.json({ username: req.user.username });
 });
 
 router.post("/register", async (req, res, next) => {
