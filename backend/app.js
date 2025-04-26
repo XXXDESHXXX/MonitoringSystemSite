@@ -128,5 +128,93 @@ app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, r
   }
 });
 
+app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = req.params.metric_id;
+    const userId   = req.user.id;
+
+    // Проверяем, что метрика существует
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) {
+      return res.status(404).json({ error: 'Metric not found' });
+    }
+
+    // Находим или создаём запись Trackable
+    const [trackable, created] = await Trackable.findOrCreate({
+      where:  { user_id: userId, metric_id: metricId },
+      defaults:{ user_id: userId, metric_id: metricId }
+    });
+
+    return res
+      .status(created ? 201 : 200)
+      .json({
+        message: created
+          ? 'Metric is now being tracked'
+          : 'Metric was already tracked',
+        trackable
+      });
+  } catch (err) {
+    console.error('Error in POST /metrics/:metric_id/track:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 2) Удаление из избранного
+app.delete('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = req.params.metric_id;
+    const userId   = req.user.id;
+
+    // Проверяем, что метрика существует
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) {
+      return res.status(404).json({ error: 'Metric not found' });
+    }
+
+    // Удаляем запись Trackable
+    const deletedCount = await Trackable.destroy({
+      where: { user_id: userId, metric_id: metricId }
+    });
+
+    if (deletedCount === 0) {
+      // Ничего не удалилось — значило, не было в избранном
+      return res
+        .status(404)
+        .json({ message: 'Metric was not in tracked list' });
+    }
+
+    return res
+      .status(200)
+      .json({ message: 'Metric has been untracked' });
+  } catch (err) {
+    console.error('Error in DELETE /metrics/:metric_id/track:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 3) Получение списка всех отслеживаемых метрик пользователя
+app.get('/metrics/tracked', ensureAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Находим все записи Trackable для юзера
+    const tracked = await Trackable.findAll({
+      where: { user_id: userId },
+      include: [{ model: Metric, attributes: ['id', 'name'] }]
+    });
+
+    // Формируем ответ вида [{ id, name }, …]
+    const result = tracked.map(t => ({
+      id: t.Metric.id,
+      name: t.Metric.name
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error('Error in GET /metrics/tracked:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server on port ${PORT}`));

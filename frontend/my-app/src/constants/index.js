@@ -1,9 +1,11 @@
-export const BASE_API_URL = '';  // CRA-proxy
+export const BASE_API_URL = '';
 
 export const API_ENDPOINTS = {
   me: '/auth/me',
   logout: '/auth/logout',
   listMetrics: '/metrics',
+  trackMetric: (id) => `/metrics/${id}/track`,
+  trackedMetrics: '/metrics/tracked',
   loadAverage: '/metrics/load_average',
   cpuSeconds: '/metrics/node_cpu_seconds_total',
   memFreeBytes: '/metrics/node_memory_memfree_bytes',

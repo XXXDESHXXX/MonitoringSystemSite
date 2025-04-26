@@ -8,11 +8,12 @@ import MetricsList from './components/MetricsList';
 import LoadAverage from './components/LoadAverage';
 import NodeCPUSecondsTotal from './components/NodeCPUSecondsTotal';
 import { AuthProvider, AuthContext } from './AuthContext';
+import Favorites from './components/Favorites';
 import ProtectedRoute from './ProtectedRoute';
 import './App.css';
 import NodeMemoryFreeBytes from "./components/NodeMemoryFreeBytes";
 
-function Home() { return <h2>Главная</h2>; }
+function Home() { return <Favorites />;; }
 function About() { return <h2>О нас</h2>; }
 
 function Navbar() {
@@ -56,7 +57,7 @@ function App() {
       <Router>
         <Navbar />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<ProtectedRoute><Home/></ProtectedRoute>} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/about" element={<ProtectedRoute><About/></ProtectedRoute>} />
