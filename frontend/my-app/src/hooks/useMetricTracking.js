@@ -1,35 +1,55 @@
+// src/hooks/useMetricTracking.js
+
 import { useState, useEffect, useCallback } from 'react';
-import { getAbsoluteURL } from '../utils/utils';
-import { API_ENDPOINTS } from '../constants';
+import { getAbsoluteURL }                  from '../utils/utils';
+import { API_ENDPOINTS }                   from '../constants';
 
 export default function useMetricTracking(metricName) {
-  const [metricId, setMetricId] = useState(null);
-  const [isTracked, setIsTracked] = useState(false);
+  // ID метрики в БД
+  const [metricId, setMetricId]     = useState(null);
+  // находится ли она сейчас в избранном
+  const [isTracked, setIsTracked]   = useState(false);
+  // признак того, что init-запросы завершились
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     async function init() {
       try {
-        // Получаем все метрики и список отслеживаемых
+        // параллельно получаем все метрики и список отслеживаемых ID
         const [allRes, trackedRes] = await Promise.all([
-          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics), { credentials: 'include' }),
-          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' })
+          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics),   { credentials: 'include' }),
+          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics),{ credentials: 'include' })
         ]);
-        const [allMetrics, tracked] = await Promise.all([allRes.json(), trackedRes.json()]);
+        if (!allRes.ok || !trackedRes.ok) {
+          console.error('Failed to fetch metrics or tracked metrics');
+          return;
+        }
 
-        // Ищем метрику по имени
+        const [allMetrics, tracked] = await Promise.all([
+          allRes.json(),
+          trackedRes.json()
+        ]);
+
+        // находим объект метрики по её имени
         const metric = allMetrics.find(m => m.name === metricName);
-        if (!metric) return;
+        if (!metric) {
+          console.warn(`Metric "${metricName}" not found`);
+          return;
+        }
+
+        // сохраняем её ID
         setMetricId(metric.id);
 
-        // Собираем список ID отслеживаемых
+        // tracked может быть массивом {id,name} или просто [id,...]
         const trackedIds = tracked.map(x => (typeof x === 'object' ? x.id : x));
         setIsTracked(trackedIds.includes(metric.id));
+
         setInitialized(true);
       } catch (err) {
         console.error('useMetricTracking init error:', err);
       }
     }
+
     init();
   }, [metricName]);
 
@@ -41,11 +61,15 @@ export default function useMetricTracking(metricName) {
         getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)),
         { method, credentials: 'include' }
       );
-      if (res.ok) setIsTracked(prev => !prev);
+      if (res.ok) {
+        setIsTracked(prev => !prev);
+      } else {
+        console.error(`toggleTracking failed: ${res.status}`);
+      }
     } catch (err) {
       console.error('toggleTracking error:', err);
     }
   }, [isTracked, metricId]);
 
-  return { isTracked, toggleTracking, initialized };
+  return { metricId, isTracked, toggleTracking, initialized };
 }

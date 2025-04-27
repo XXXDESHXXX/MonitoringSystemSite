@@ -8,7 +8,13 @@ const Tag = sequelize.define('Tag', {
     autoIncrement: true
   },
   name: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  color: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: '#cccccc'
   }
 }, {
   tableName: 'Tags',

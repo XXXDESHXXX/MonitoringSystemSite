@@ -21,7 +21,7 @@ router.post('/login', (req, res, next) => {
 
 
 router.get('/me', ensureAuthenticated, (req, res) => {
-  res.json({ username: req.user.username });
+  res.json({ username: req.user.username, id: req.user.id });
 });
 
 router.post("/register", async (req, res, next) => {

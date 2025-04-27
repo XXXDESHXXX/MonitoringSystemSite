@@ -12,6 +12,11 @@ import { ensureAuthenticated } from "./middleware/auth.js";
 import Metric from "./models/Metric.js";
 import Trackable from "./models/Trackable.js";
 import MetricValue from "./models/MetricValue.js";
+import Tag from './models/Tag.js';
+import MetricTag from './models/MetricTag.js';
+import Comment from './models/Comment.js';
+import User    from './models/User.js';
+import Metric  from './models/Metric.js';
 
 const app = express();
 app.use(cors({
@@ -48,15 +53,25 @@ sequelize.sync({ force: true })
 // 1) Список всех метрик
 app.get('/metrics', ensureAuthenticated, async (req, res) => {
   try {
-    // Lazy‐создаём обе метрики при первом обращении к списку
     await Promise.all([
       Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' }, defaults: { name: 'LOAD_AVERAGE' } }),
       Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' }, defaults: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
-      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' }, defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' } })
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' }, defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' } }),
     ]);
 
-    const metrics = await Metric.findAll({ attributes: ['id', 'name'] });
-    res.json(metrics);
+      const metrics = await Metric.findAll({
+        attributes: ['id','name'],
+        include: [{
+          model: Tag,
+          attributes: ['id','name','color']
+        }]
+      });
+      const result = metrics.map(m => ({
+        id: m.id,
+        name: m.name,
+        tags: m.Tags.map(t => ({ id: t.id, name: t.name, color: t.color }))
+      }));
+      res.json(result);
   } catch (err) {
     console.error('Error fetching metrics:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -213,6 +228,143 @@ app.get('/metrics/tracked', ensureAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('Error in GET /metrics/tracked:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+app.get('/tags', ensureAuthenticated, async (req, res) => {
+  try {
+    const tags = await Tag.findAll({ attributes: ['id', 'name'] });
+    res.json(tags);
+  } catch (err) {
+    console.error('Error in GET /tags:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+app.get('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = req.params.metric_id;
+    // проверяем, что метрика есть
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) return res.status(404).json({ error: 'Metric not found' });
+
+    // достаём комментарии вместе с автором
+    const comments = await Comment.findAll({
+      where: { metric_id: metricId },
+      include: [{ model: User, attributes: ['id','username'] }],
+      order: [['createdAt','ASC']]
+    });
+
+    // форматируем
+    const result = comments.map(c => ({
+      id: c.id,
+      text: c.comment,
+      user: c.User.username,
+      userId: c.User.id,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error('GET /metrics/:id/comments error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /metrics/:metric_id/comments
+// — добавить новый комментарий
+app.post('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = req.params.metric_id;
+    const userId   = req.user.id;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Empty comment' });
+    }
+
+    // проверяем, что метрика есть
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) return res.status(404).json({ error: 'Metric not found' });
+
+    const comment = await Comment.create({
+      comment: text.trim(),
+      metric_id: metricId,
+      user_id: userId
+    });
+
+    // достаём созданный с данными юзера
+    const created = await Comment.findByPk(comment.id, {
+      include: [{ model: User, attributes: ['username'] }]
+    });
+
+    res.status(201).json({
+      id: created.id,
+      text: created.comment,
+      user: created.User.username,
+      userId: created.User.id,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt
+    });
+  } catch (err) {
+    console.error('POST /metrics/:id/comments error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /comments/:comment_id
+// — редактировать свой комментарий
+app.put('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
+  try {
+    const commentId = req.params.comment_id;
+    const userId    = req.user.id;
+    const { text }  = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Empty comment' });
+    }
+
+    const comment = await Comment.findByPk(commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    if (comment.user_id !== userId) {
+      return res.status(403).json({ error: 'Not your comment' });
+    }
+
+    comment.comment = text.trim();
+    await comment.save();
+
+    res.json({
+      id: comment.id,
+      text: comment.comment,
+      updatedAt: comment.updatedAt
+    });
+  } catch (err) {
+    console.error('PUT /comments/:id error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /comments/:comment_id
+// — удалить свой комментарий
+app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
+  try {
+    const commentId = req.params.comment_id;
+    const userId    = req.user.id;
+
+    const comment = await Comment.findByPk(commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    if (comment.user_id !== userId) {
+      return res.status(403).json({ error: 'Not your comment' });
+    }
+
+    await comment.destroy();
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    console.error('DELETE /comments/:id error', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

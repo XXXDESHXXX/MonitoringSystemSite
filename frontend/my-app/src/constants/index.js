@@ -11,4 +11,7 @@ export const API_ENDPOINTS = {
   memFreeBytes: '/metrics/node_memory_memfree_bytes',
   login: '/auth/login',
   register: '/auth/register',
+  tags: '/tags',
+  commentsByMetric: (metricId) => `/metrics/${metricId}/comments`,
+  updateComment:    (commentId) => `/comments/${commentId}`,
 };

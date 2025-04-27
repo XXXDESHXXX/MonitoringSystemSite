@@ -1,32 +1,37 @@
-// src/components/MetricsList.js
 import React, { useEffect, useState } from 'react';
 import { useNavigate }      from 'react-router-dom';
 import { getAbsoluteURL }   from '../utils/utils';
 import { API_ENDPOINTS }    from '../constants';
-import StarToggle           from './StarToggle';  // можно оставить CSS-анимацию
+import StarToggle           from './StarToggle';
 import './MetricsList.css';
 
 export default function MetricsList() {
-  const [metrics, setMetrics]       = useState([]);
-  const [trackedIds, setTrackedIds] = useState(new Set());
+  const [metrics, setMetrics]               = useState([]);
+  const [allTags, setAllTags]               = useState([]);
+  const [trackedIds, setTrackedIds]         = useState(new Set());
+  const [selectedTagIds, setSelectedTagIds] = useState(new Set());
+  const [searchQuery, setSearchQuery]       = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     async function loadAll() {
       try {
-        const [allRes, trackedRes] = await Promise.all([
-          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics),   { credentials: 'include' }),
-          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics),{ credentials: 'include' }),
+        const [allRes, trackedRes, tagsRes] = await Promise.all([
+          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics),    { credentials: 'include' }),
+          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' }),
+          fetch(getAbsoluteURL(API_ENDPOINTS.tags),           { credentials: 'include' }),
         ]);
-        const all     = await allRes.json();
-        const tracked = await trackedRes.json();
+        const [all, tracked, tags] = await Promise.all([
+          allRes.json(), trackedRes.json(), tagsRes.json()
+        ]);
 
         setMetrics(Array.isArray(all) ? all : []);
-        // tracked может быть [{id,name},…] или [id,…]
-        const ids = tracked.map(x => typeof x === 'object' ? x.id : x);
+        setAllTags(Array.isArray(tags) ? tags : []);
+        const ids = (Array.isArray(tracked) ? tracked : [])
+          .map(x => typeof x === 'object' ? x.id : x);
         setTrackedIds(new Set(ids));
       } catch (err) {
-        console.error('Error loading metrics/tracked:', err);
+        console.error('Error loading data:', err);
       }
     }
     loadAll();
@@ -48,25 +53,93 @@ export default function MetricsList() {
     }
   };
 
+  const toggleFilterTag = (tagId) => {
+    setSelectedTagIds(prev => {
+      const copy = new Set(prev);
+      copy.has(tagId) ? copy.delete(tagId) : copy.add(tagId);
+      return copy;
+    });
+  };
+
+  // Фильтрация по тегам + по поисковому запросу
+  const filteredMetrics = metrics.filter(m => {
+    // 1) фильтр по имени
+    if (searchQuery.trim()) {
+      const name = m.name.replace(/_/g, ' ').toLowerCase();
+      if (!name.includes(searchQuery.trim().toLowerCase())) {
+        return false;
+      }
+    }
+    // 2) фильтр по выбранным тегам
+    if (selectedTagIds.size > 0) {
+      const metricTagIds = new Set((m.tags || []).map(t => t.id));
+      for (let tid of selectedTagIds) {
+        if (!metricTagIds.has(tid)) return false;
+      }
+    }
+    return true;
+  });
+
   return (
-    <div className="metrics-container">
-      <h1 className="metrics-title">Список метрик</h1>
-      <ul className="metrics-list">
-        {metrics.map(m => (
-          <li key={m.id} className="metrics-item">
-            <div
-              className="metrics-link"
-              onClick={() => navigate(`/metrics/${m.name.toLowerCase()}`)}
+    <div className="metrics-page">
+      <aside className="tag-sidebar">
+        <h2>Фильтр по тегам</h2>
+        <ul className="tag-list">
+          {allTags.map(t => (
+            <li
+              key={t.id}
+              className={`tag-item${selectedTagIds.has(t.id) ? ' selected' : ''}`}
+              onClick={() => toggleFilterTag(t.id)}
             >
-              {m.name.replace(/_/g, ' ')}
-            </div>
-            <StarToggle
-              isOn={trackedIds.has(m.id)}
-              onToggle={() => toggleTrack(m.id)}
-            />
-          </li>
-        ))}
-      </ul>
+              {t.name}
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <section className="metrics-main">
+        <div className="metrics-header">
+          <h1 className="metrics-title">Список метрик</h1>
+          <input
+            type="text"
+            className="metrics-search"
+            placeholder="Поиск по названию…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <ul className="metrics-list">
+          {filteredMetrics.map(m => (
+            <li key={m.id} className="metrics-item">
+              <div
+                className="metrics-link"
+                onClick={() => navigate(`/metrics/${m.name.toLowerCase()}`)}
+              >
+                {m.name.replace(/_/g, ' ')}
+              </div>
+              <div className="metrics-tags">
+                {m.tags.map(tag => (
+                  <span
+                    key={tag.id}
+                    className="tag"
+                    style={{ backgroundColor: tag.color, color: '#000' }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+              <StarToggle
+                isOn={trackedIds.has(m.id)}
+                onToggle={() => toggleTrack(m.id)}
+              />
+            </li>
+          ))}
+          {filteredMetrics.length === 0 && (
+            <li className="no-results">Ничего не найдено.</li>
+          )}
+        </ul>
+      </section>
     </div>
   );
 }

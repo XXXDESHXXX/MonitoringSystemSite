@@ -1,33 +1,169 @@
+/* -------------------------------------------------- */
+/* Основная обёртка всей страницы метрик (контейнер)  */
+/* -------------------------------------------------- */
+.metrics-page {
+  display: flex;
+  gap: 20px;
+}
+
+/* -------------------------------------------------- */
+/* Левая панель с фильтром по тегам                   */
+/* -------------------------------------------------- */
+.tag-sidebar {
+  width: 200px;
+  padding: 10px;
+  background: #fafafa;
+  border-radius: 8px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+}
+.tag-sidebar h2 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+}
+.tag-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tag-item {
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #eee;
+  transition: background 0.2s;
+}
+.tag-item:hover {
+  background: #ddd;
+}
+.tag-item.selected {
+  background: #007bff;
+  color: #fff;
+}
+
+/* -------------------------------------------------- */
+/* Правая панель — заголовок, поиск и список метрик    */
+/* -------------------------------------------------- */
+.metrics-main {
+  flex: 1;            /* занимает всё оставшееся место */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Убрали жёсткое ограничение ширины и центрирование */
 .metrics-container {
-  max-width: 600px;
-  margin: 20px auto;
+  width: 100%;       /* растягивается на всю ширину .metrics-main */
+  max-width: none;   /* отменяем прежнее max-width:600px */
+  margin: 0;         /* убираем margin:auto */
   padding: 20px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-sizing: border-box;
 }
-.metrics-title {
-  text-align: center;
-  font-size: 2rem;
+
+.metrics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+.metrics-title {
+  font-size: 2rem;
   color: #333;
 }
+
+.metrics-search {
+  padding: 6px 10px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 200px;
+}
+
 .metrics-list {
   list-style: none;
   padding: 0;
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+  flex: 1;             /* чтобы список разрастался в .metrics-container */
+  overflow-y: auto;    /* при большом количестве метрик скролл */
 }
+
 .metrics-item {
   padding: 12px;
   background: #f7f7f7;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
-  font-size: 1.1rem;
   color: #333;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
 .metrics-item:hover {
   background: #e0e0e0;
+}
+
+.metrics-link {
+  flex-grow: 1;
+}
+
+/* -------------------------------------------------- */
+/* Теги внутри каждого элемента                       */
+/* -------------------------------------------------- */
+.metrics-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  /* цвет фона и текста задаются инлайн из React:
+     <span style={{ backgroundColor: tag.color, color: '#000' }}> */
+}
+
+/* -------------------------------------------------- */
+/* Пустой результат поиска                           */
+/* -------------------------------------------------- */
+.no-results {
+  padding: 12px;
+  text-align: center;
+  color: #777;
+}
+
+
+/* Убедитесь, что .metrics-item — flex-контейнер */
+.metrics-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* название+звезда слева, теги или что-то ещё — справа */
+  padding: 12px;
+  background: #f7f7f7;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+/* Специальный класс для обёртки названия и звезды */
+.metrics-item .title-with-star {
+  display: flex;
+  align-items: center;
+  /* Теперь название и звезда в одном блоке */
+}
+
+/* Добавляем отступ у звёздочки */
+.star-toggle {
+  margin-left: 8px; /* подберите то, что вам нравится */
 }
