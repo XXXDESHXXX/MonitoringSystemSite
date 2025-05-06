@@ -1,9 +1,6 @@
+// src/models/User.js
 import { DataTypes } from 'sequelize';
-import sequelize from '../db.js';
-
-import Metric from './Metric.js';
-import Comment from './Comment.js';
-import Trackable from './Trackable.js';
+import sequelize      from '../db.js';
 
 const User = sequelize.define('User', {
   id: {
@@ -12,8 +9,9 @@ const User = sequelize.define('User', {
     autoIncrement: true
   },
   username: {
-    type: DataTypes.STRING(16),  // ограничение на 16 символов
-    allowNull: false
+    type: DataTypes.STRING(16),
+    allowNull: false,
+    unique: true
   },
   password: {
     type: DataTypes.BLOB,
@@ -24,21 +22,17 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   email: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING,
+    validate: { isEmail: true }
   },
   role: {
-    type: DataTypes.STRING
+    type: DataTypes.ENUM('user','admin'),
+    allowNull: false,
+    defaultValue: 'user'
   }
 }, {
   tableName: 'Users',
   timestamps: true
 });
-
-
-User.hasMany(Comment, { foreignKey: 'user_id' });
-Comment.belongsTo(User, { foreignKey: 'user_id' });
-
-User.hasMany(Trackable, { foreignKey: 'user_id' });
-Trackable.belongsTo(User, { foreignKey: 'user_id' });
 
 export default User;

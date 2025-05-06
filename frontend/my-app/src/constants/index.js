@@ -12,6 +12,7 @@ export const API_ENDPOINTS = {
   login: '/auth/login',
   register: '/auth/register',
   tags: '/tags',
+  metricValues: (id) => `/metrics/${id}/values`,
   commentsByMetric: (metricId) => `/metrics/${metricId}/comments`,
   updateComment:    (commentId) => `/comments/${commentId}`,
 };

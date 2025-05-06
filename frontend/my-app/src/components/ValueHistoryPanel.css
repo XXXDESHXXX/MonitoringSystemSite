@@ -1,0 +1,71 @@
+.history-panel {
+  margin-top: 20px;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 0;
+}
+.toggle-btn:hover {
+  text-decoration: underline;
+}
+
+.history-body {
+  overflow: hidden;
+  border-top: 1px solid #ddd;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.history-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.history-controls button {
+  background: #f0f0f0;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.history-controls button.active {
+  background: #007bff;
+  color: #fff;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.hist-date {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.hist-value {
+  font-weight: bold;
+  color: #333;
+}
+
+.no-data {
+  text-align: center;
+  color: #777;
+  padding: 8px 0;
+}

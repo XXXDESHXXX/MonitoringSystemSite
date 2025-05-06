@@ -1,15 +1,11 @@
+/* src/components/CommentsPanel.css */
+
 .comments-panel {
-  width: 300px;
-  padding: 10px;
-  border-left: 1px solid #ddd;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  width: 100%;
+  padding-top: 10px;
 }
 
 .comments-list {
-  overflow-y: auto;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -40,21 +36,29 @@
   margin-left: auto;
 }
 
-.comment-controls button {
-  margin-left: 4px;
-  background: none;
-  border: none;
-  color: #007bff;
-  cursor: pointer;
-  font-size: 0.8rem;
+.comment-controls {
+  display: flex;
+  gap: 6px;
 }
 
-.comment-controls button:hover {
-  text-decoration: underline;
+.icon-button {
+  display: inline-flex;
+  cursor: pointer;
+  color: #007bff;
+}
+
+.icon-button:hover {
+  color: #0056b3;
 }
 
 .comment-text {
   margin: 0;
+}
+
+.comment-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .comment-add textarea {
@@ -65,7 +69,6 @@
 }
 
 .comment-add button {
-  margin-top: 4px;
   align-self: flex-end;
   padding: 6px 12px;
 }

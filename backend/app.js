@@ -7,6 +7,7 @@ import sequelize from "./db.js";
 import session from 'express-session';
 import authRouter from "./routes/auth.js";
 import { ensureAuthenticated } from "./middleware/auth.js";
+import db from './models/index.js';
 
 // Модели
 import Metric from "./models/Metric.js";
@@ -16,7 +17,6 @@ import Tag from './models/Tag.js';
 import MetricTag from './models/MetricTag.js';
 import Comment from './models/Comment.js';
 import User    from './models/User.js';
-import Metric  from './models/Metric.js';
 
 const app = express();
 app.use(cors({
@@ -45,10 +45,15 @@ app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
 
-// Синхронизация БД
-sequelize.sync({ force: true })
-  .then(() => console.log('DB synced successfully'))
-  .catch(err => console.error('Error syncing DB:', err));
+(async () => {
+  try {
+    await db.sequelize.authenticate();
+    await db.sequelize.sync({ force: true });
+    console.log('База данных подключена и таблички синхронизированы');
+  } catch (err) {
+    console.error('Ошибка инициализации БД:', err);
+  }
+})();
 
 // 1) Список всех метрик
 app.get('/metrics', ensureAuthenticated, async (req, res) => {
@@ -367,6 +372,52 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = Number(req.params.metric_id);
+    const { from, to } = req.query;
+
+    // Проверка метрики
+    const metric = await Metric.findByPk(metricId);
+    if (!metric) return res.status(404).json({ error: 'Metric not found' });
+
+    // Параметры фильтра по дате
+    const where = { metric_id: metricId };
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt[db.Sequelize.Op.gte] = new Date(from);
+      if (to)   where.createdAt[db.Sequelize.Op.lte] = new Date(to);
+    }
+
+    // Берём все значения, упорядоченные по времени
+    const vals = await MetricValue.findAll({
+      where,
+      order: [['createdAt','ASC']],
+      attributes: ['value','createdAt']
+    });
+
+    // Оставляем только уникальные value по порядку
+    const seen = new Set();
+    const unique = vals.filter(v => {
+      if (seen.has(v.value)) return false;
+      seen.add(v.value);
+      return true;
+    });
+
+    // Форматируем ответ
+    res.json(unique.map(v => ({
+      value: v.value,
+      date: v.createdAt
+    })));
+  } catch (err) {
+    console.error('GET /metrics/:id/values error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server on port ${PORT}`));

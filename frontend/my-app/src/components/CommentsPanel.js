@@ -1,26 +1,26 @@
 // src/components/CommentsPanel.js
-import React, { useEffect, useState } from 'react';
-import { getAbsoluteURL } from '../utils/utils';
-import { API_ENDPOINTS }  from '../constants';
-import { useAuth }        from '../AuthContext'; // чтобы узнать current user
+import React, {useContext, useEffect, useState} from 'react';
+import { motion }           from 'framer-motion';
+import { FaEdit, FaTrash }  from 'react-icons/fa';
+import { getAbsoluteURL }   from '../utils/utils';
+import { API_ENDPOINTS }    from '../constants';
+import { AuthContext }          from '../AuthContext';
 import './CommentsPanel.css';
 
 export default function CommentsPanel({ metricId }) {
+  const { user } = useContext(AuthContext);
   const [comments, setComments] = useState([]);
   const [newText, setNewText]   = useState('');
-  const { user } = useAuth();   // { username, id, ... }
 
-  // загрузка
   useEffect(() => {
     fetch(getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)), {
       credentials: 'include'
     })
       .then(res => res.json())
-      .then(data => setComments(data))
+      .then(setComments)
       .catch(console.error);
   }, [metricId]);
 
-  // добавить
   const addComment = async () => {
     if (!newText.trim()) return;
     const res = await fetch(
@@ -28,35 +28,38 @@ export default function CommentsPanel({ metricId }) {
       {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: newText })
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ text: newText.trim() })
       }
     );
     if (res.ok) {
       const created = await res.json();
+      created.userId = user.id;
+      created.user   = user.username;
+      // сразу добавляем в список
       setComments(prev => [...prev, created]);
       setNewText('');
     }
   };
 
-  // обновить
   const saveComment = async (id, text) => {
     const res = await fetch(
       getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
       {
         method: 'PUT',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ text: text.trim() })
       }
     );
     if (res.ok) {
       const updated = await res.json();
-      setComments(prev => prev.map(c => c.id === id ? { ...c, text: updated.text, updatedAt: updated.updatedAt } : c));
+      setComments(prev =>
+        prev.map(c => c.id === id ? { ...c, text: updated.text, updatedAt: updated.updatedAt } : c)
+      );
     }
   };
 
-  // удалить
   const deleteComment = async (id) => {
     const res = await fetch(
       getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
@@ -78,7 +81,7 @@ export default function CommentsPanel({ metricId }) {
           <CommentItem
             key={c.id}
             comment={c}
-            isOwn={c.userId === user.id}
+            isOwn={user && c.userId === user.id}
             onSave={saveComment}
             onDelete={deleteComment}
           />
@@ -91,13 +94,14 @@ export default function CommentsPanel({ metricId }) {
           onChange={e => setNewText(e.target.value)}
           placeholder="Написать комментарий..."
         />
-        <button onClick={addComment} disabled={!newText.trim()}>Отправить</button>
+        <button onClick={addComment} disabled={!newText.trim()}>
+          Отправить
+        </button>
       </div>
     </div>
   );
 }
 
-// Вложенный компонент для каждого комментария:
 function CommentItem({ comment, isOwn, onSave, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [text, setText]       = useState(comment.text);
@@ -111,22 +115,42 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
         </span>
         {isOwn && (
           <div className="comment-controls">
-            {editing
-              ? <button onClick={() => { onSave(comment.id, text); setEditing(false); }}>Сохранить</button>
-              : <button onClick={() => setEditing(true)}>Изменить</button>
-            }
-            <button onClick={() => onDelete(comment.id)}>Удалить</button>
+            {editing ? (
+              <motion.span
+                className="icon-button"
+                whileHover={{ scale: 1.2 }}
+                onClick={() => { onSave(comment.id, text); setEditing(false); }}
+              >
+                <FaEdit />
+              </motion.span>
+            ) : (
+              <motion.span
+                className="icon-button"
+                whileHover={{ scale: 1.2 }}
+                onClick={() => setEditing(true)}
+              >
+                <FaEdit />
+              </motion.span>
+            )}
+            <motion.span
+              className="icon-button"
+              whileHover={{ rotate: 90 }}
+              onClick={() => onDelete(comment.id)}
+            >
+              <FaTrash />
+            </motion.span>
           </div>
         )}
       </div>
-      {editing
-        ? <textarea
-            rows={2}
-            value={text}
-            onChange={e => setText(e.target.value)}
-          />
-        : <p className="comment-text">{comment.text}</p>
-      }
+      {editing ? (
+        <textarea
+          rows={2}
+          value={text}
+          onChange={e => setText(e.target.value)}
+        />
+      ) : (
+        <p className="comment-text">{comment.text}</p>
+      )}
     </div>
   );
 }
