@@ -18,6 +18,8 @@ import MetricTag from './models/MetricTag.js';
 import Comment from './models/Comment.js';
 import User    from './models/User.js';
 
+import { Op } from 'sequelize';
+
 const app = express();
 app.use(cors({
   origin: 'http://localhost:3000',
@@ -58,25 +60,41 @@ app.use("/auth", authRouter);
 // 1) Список всех метрик
 app.get('/metrics', ensureAuthenticated, async (req, res) => {
   try {
+    // 1) Всегда гарантируем, что базовые метрики есть в БД
     await Promise.all([
-      Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' }, defaults: { name: 'LOAD_AVERAGE' } }),
-      Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' }, defaults: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
-      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' }, defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' } }),
     ]);
 
-      const metrics = await Metric.findAll({
-        attributes: ['id','name'],
-        include: [{
-          model: Tag,
-          attributes: ['id','name','color']
-        }]
-      });
-      const result = metrics.map(m => ({
-        id: m.id,
-        name: m.name,
-        tags: m.Tags.map(t => ({ id: t.id, name: t.name, color: t.color }))
-      }));
-      res.json(result);
+    // 2) Читаем параметр поиска из query-string
+    const { search } = req.query;
+
+    // 3) Формируем условие WHERE для Sequelize
+    const where = {};
+    if (search && search.trim()) {
+      // PostgreSQL: iLike — регистронезависимый поиск
+      where.name = { [Op.iLike]: `%${search.trim()}%` };
+    }
+
+    // 4) Достаём метрики с учётом фильтра
+    const metrics = await Metric.findAll({
+      where,
+      attributes: ['id', 'name'],
+      include: [{
+        model: Tag,
+        attributes: ['id', 'name', 'color']
+      }]
+    });
+
+    // 5) Приводим к нужному формату и возвращаем
+    const result = metrics.map(m => ({
+      id: m.id,
+      name: m.name,
+      tags: m.Tags.map(t => ({ id: t.id, name: t.name, color: t.color }))
+    }));
+    res.json(result);
+
   } catch (err) {
     console.error('Error fetching metrics:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -376,7 +394,7 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
 app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = Number(req.params.metric_id);
-    const { from, to } = req.query;
+    const { from, to, sort_by = 'date', order = 'asc' } = req.query;
 
     // Проверка метрики
     const metric = await Metric.findByPk(metricId);
@@ -386,18 +404,22 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
     const where = { metric_id: metricId };
     if (from || to) {
       where.createdAt = {};
-      if (from) where.createdAt[db.Sequelize.Op.gte] = new Date(from);
-      if (to)   where.createdAt[db.Sequelize.Op.lte] = new Date(to);
+      if (from) where.createdAt[Op.gte] = new Date(from);
+      if (to)   where.createdAt[Op.lte] = new Date(to);
     }
 
-    // Берём все значения, упорядоченные по времени
+    // Определяем поле сортировки
+    const orderField = sort_by === 'value' ? 'value' : 'createdAt';
+    const orderDir = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+    // Запрос с сортировкой
     const vals = await MetricValue.findAll({
       where,
-      order: [['createdAt','ASC']],
+      order: [[ orderField, orderDir ]],
       attributes: ['value','createdAt']
     });
 
-    // Оставляем только уникальные value по порядку
+    // Только уникальные значения по порядку
     const seen = new Set();
     const unique = vals.filter(v => {
       if (seen.has(v.value)) return false;
@@ -406,10 +428,7 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
     });
 
     // Форматируем ответ
-    res.json(unique.map(v => ({
-      value: v.value,
-      date: v.createdAt
-    })));
+    res.json(unique.map(v => ({ value: v.value, date: v.createdAt })));
   } catch (err) {
     console.error('GET /metrics/:id/values error', err);
     res.status(500).json({ error: 'Internal server error' });

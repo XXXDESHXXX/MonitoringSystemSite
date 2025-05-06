@@ -1,10 +1,10 @@
 // src/components/CommentsPanel.js
 import React, {useContext, useEffect, useState} from 'react';
-import { motion }           from 'framer-motion';
-import { FaEdit, FaTrash }  from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaEdit, FaTrash, FaCheck } from 'react-icons/fa';
 import { getAbsoluteURL }   from '../utils/utils';
 import { API_ENDPOINTS }    from '../constants';
-import { AuthContext }          from '../AuthContext';
+import { AuthContext }      from '../AuthContext';
 import './CommentsPanel.css';
 
 export default function CommentsPanel({ metricId }) {
@@ -16,9 +16,9 @@ export default function CommentsPanel({ metricId }) {
     fetch(getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)), {
       credentials: 'include'
     })
-      .then(res => res.json())
-      .then(setComments)
-      .catch(console.error);
+    .then(res => res.json())
+    .then(setComments)
+    .catch(console.error);
   }, [metricId]);
 
   const addComment = async () => {
@@ -36,7 +36,6 @@ export default function CommentsPanel({ metricId }) {
       const created = await res.json();
       created.userId = user.id;
       created.user   = user.username;
-      // сразу добавляем в список
       setComments(prev => [...prev, created]);
       setNewText('');
     }
@@ -63,10 +62,7 @@ export default function CommentsPanel({ metricId }) {
   const deleteComment = async (id) => {
     const res = await fetch(
       getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
-      {
-        method: 'DELETE',
-        credentials: 'include'
-      }
+      { method: 'DELETE', credentials: 'include' }
     );
     if (res.ok) {
       setComments(prev => prev.filter(c => c.id !== id));
@@ -115,23 +111,39 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
         </span>
         {isOwn && (
           <div className="comment-controls">
-            {editing ? (
-              <motion.span
-                className="icon-button"
-                whileHover={{ scale: 1.2 }}
-                onClick={() => { onSave(comment.id, text); setEditing(false); }}
-              >
-                <FaEdit />
-              </motion.span>
-            ) : (
-              <motion.span
-                className="icon-button"
-                whileHover={{ scale: 1.2 }}
-                onClick={() => setEditing(true)}
-              >
-                <FaEdit />
-              </motion.span>
-            )}
+            <AnimatePresence>
+              {!editing && (
+                <motion.span
+                  className="icon-button"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={() => setEditing(true)}
+                >
+                  <FaEdit />
+                </motion.span>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {editing && (
+                <motion.span
+                  className="icon-button check-button"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  onClick={() => {
+                    onSave(comment.id, text);
+                    setEditing(false);
+                  }}
+                >
+                  <FaCheck />
+                </motion.span>
+              )}
+            </AnimatePresence>
+
             <motion.span
               className="icon-button"
               whileHover={{ rotate: 90 }}
@@ -142,11 +154,13 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
           </div>
         )}
       </div>
+
       {editing ? (
         <textarea
           rows={2}
           value={text}
           onChange={e => setText(e.target.value)}
+          className="comment-edit-textarea"
         />
       ) : (
         <p className="comment-text">{comment.text}</p>

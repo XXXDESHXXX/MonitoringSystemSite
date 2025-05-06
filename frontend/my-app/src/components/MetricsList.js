@@ -62,23 +62,15 @@ export default function MetricsList() {
   };
 
   // Фильтрация по тегам + по поисковому запросу
-  const filteredMetrics = metrics.filter(m => {
-    // 1) фильтр по имени
-    if (searchQuery.trim()) {
-      const name = m.name.replace(/_/g, ' ').toLowerCase();
-      if (!name.includes(searchQuery.trim().toLowerCase())) {
-        return false;
-      }
-    }
-    // 2) фильтр по выбранным тегам
-    if (selectedTagIds.size > 0) {
-      const metricTagIds = new Set((m.tags || []).map(t => t.id));
-      for (let tid of selectedTagIds) {
-        if (!metricTagIds.has(tid)) return false;
-      }
-    }
-    return true;
-  });
+   useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.append('search', searchQuery);
+    if (selectedTagIds.size) params.append('tags', [...selectedTagIds].join(','));
+    fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { credentials: 'include' })
+      .then(res => res.json())
+      .then(setMetrics)
+      .catch(console.error);
+  }, [searchQuery, selectedTagIds]);
 
   return (
     <div className="metrics-page">
@@ -108,9 +100,8 @@ export default function MetricsList() {
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-
         <ul className="metrics-list">
-          {filteredMetrics.map(m => (
+          {metrics.map(m => (
             <li key={m.id} className="metrics-item">
               <div
                 className="metrics-link"
@@ -135,7 +126,7 @@ export default function MetricsList() {
               />
             </li>
           ))}
-          {filteredMetrics.length === 0 && (
+          {metrics.length === 0 && (
             <li className="no-results">Ничего не найдено.</li>
           )}
         </ul>
