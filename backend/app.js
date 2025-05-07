@@ -1,13 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
 import express from "express";
+import { createServer } from "http";
 import fetch from "node-fetch";
 import cors from "cors";
 import sequelize from "./db.js";
 import session from 'express-session';
 import authRouter from "./routes/auth.js";
 import { ensureAuthenticated } from "./middleware/auth.js";
+import { ensureAdmin } from './middleware/admin.js';
+import adminRouter from './routes/admin.js';
 import db from './models/index.js';
+import { Server as SocketIO } from "socket.io";
 
 // Модели
 import Metric from "./models/Metric.js";
@@ -21,6 +25,10 @@ import User    from './models/User.js';
 import { Op } from 'sequelize';
 
 const app = express();
+const httpServer = createServer(app);
+const io = new SocketIO(httpServer, {
+  cors: { origin: "http://localhost:3000", credentials: true }
+});
 app.use(cors({
   origin: 'http://localhost:3000',
   credentials: true,
@@ -46,11 +54,41 @@ app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
+app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
+// Socket.IO — подписка на комнаты по метрике
+io.on("connection", socket => {
+  socket.on("subscribe", ({ metricId }) => {
+    socket.join(`metric-${metricId}`);
+  });
+  socket.on("unsubscribe", ({ metricId }) => {
+    socket.leave(`metric-${metricId}`);
+  });
+});
+
+// При создании новых значений — эмитим событие
+async function fetchAndEmit(metricName, promQuery, jsonKey) {
+  const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
+  const track = await Trackable.findOne({
+    where: { user_id: null, metric_id: metric.id } // отслеживаем для всех, но можно усложнить
+  });
+  const response = await fetch(`http://127.0.0.1:9090/api/v1/query?query=${promQuery}`);
+  const data = await response.json();
+  if (data.status === "success" && data.data.result.length) {
+    const val = parseFloat(data.data.result[0].value[1]);
+    await MetricValue.create({ value: val, metric_id: metric.id });
+    // шлём всем в комнате этого metricId
+    io.to(`metric-${metric.id}`).emit("newValue", {
+      metricId: metric.id,
+      value: val,
+      date: new Date().toISOString()
+    });
+  }
+}
 
 (async () => {
   try {
     await db.sequelize.authenticate();
-    await db.sequelize.sync({ force: true });
+    await db.sequelize.sync({ alter: true });
     console.log('База данных подключена и таблички синхронизированы');
   } catch (err) {
     console.error('Ошибка инициализации БД:', err);
@@ -60,36 +98,51 @@ app.use("/auth", authRouter);
 // 1) Список всех метрик
 app.get('/metrics', ensureAuthenticated, async (req, res) => {
   try {
-    // 1) Всегда гарантируем, что базовые метрики есть в БД
+    // 1) Убедимся, что базовые метрики есть
     await Promise.all([
       Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' } }),
       Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
       Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' } }),
     ]);
 
-    // 2) Читаем параметр поиска из query-string
-    const { search } = req.query;
+    // 2) Считаем параметры из query
+    const { search, tags } = req.query;
 
-    // 3) Формируем условие WHERE для Sequelize
+    // 3) WHERE по имени (search)
     const where = {};
     if (search && search.trim()) {
-      // PostgreSQL: iLike — регистронезависимый поиск
       where.name = { [Op.iLike]: `%${search.trim()}%` };
     }
 
-    // 4) Достаём метрики с учётом фильтра
+    // 4) INCLUDE для тегов
+    const includeTag = {
+      model: Tag,
+      attributes: ['id', 'name', 'color'],
+      through: { attributes: [] },  // убираем лишние поля из join‑таблицы
+    };
+
+    if (tags) {
+      // разобьём строку "1,2,3" в [1,2,3]
+      const tagIds = tags
+        .split(',')
+        .map(s => parseInt(s, 10))
+        .filter(n => !isNaN(n));
+      if (tagIds.length) {
+        includeTag.where    = { id: tagIds };
+        includeTag.required = true;  // INNER JOIN, т.е. хотя бы один из указанных
+      }
+    }
+
+    // 5) Запрос с фильтрами
     const metrics = await Metric.findAll({
       where,
       attributes: ['id', 'name'],
-      include: [{
-        model: Tag,
-        attributes: ['id', 'name', 'color']
-      }]
+      include: [ includeTag ]
     });
 
-    // 5) Приводим к нужному формату и возвращаем
+    // 6) Отдаём в нужном формате
     const result = metrics.map(m => ({
-      id: m.id,
+      id:   m.id,
       name: m.name,
       tags: m.Tags.map(t => ({ id: t.id, name: t.name, color: t.color }))
     }));
@@ -100,7 +153,6 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 // 2) LOAD_AVERAGE (как было)
 app.get('/metrics/load_average', ensureAuthenticated, async (req, res) => {
   try {
@@ -391,16 +443,30 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
   }
 });
 
+
+// Стримим каждые 5 секунд значение Load Average
+setInterval(
+  () => fetchAndEmit("LOAD_AVERAGE", "node_load1"),
+  5000
+);
+
+// Стримим каждые 5 секунд значение CPU Seconds Total
+setInterval(
+  () => fetchAndEmit("NODE_CPU_SECONDS_TOTAL", "node_cpu_seconds_total"),
+  5000
+);
+
+// Стримим каждые 5 секунд значение Memory MemFree Bytes
+setInterval(
+  () => fetchAndEmit("NODE_MEMORY_MEMFREE_BYTES", "node_memory_MemFree_bytes"),
+  5000
+);
+// HTTP-эндпоинт для истории без realtime (для initial load)
 app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = Number(req.params.metric_id);
     const { from, to, sort_by = 'date', order = 'asc' } = req.query;
 
-    // Проверка метрики
-    const metric = await Metric.findByPk(metricId);
-    if (!metric) return res.status(404).json({ error: 'Metric not found' });
-
-    // Параметры фильтра по дате
     const where = { metric_id: metricId };
     if (from || to) {
       where.createdAt = {};
@@ -408,18 +474,16 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
       if (to)   where.createdAt[Op.lte] = new Date(to);
     }
 
-    // Определяем поле сортировки
     const orderField = sort_by === 'value' ? 'value' : 'createdAt';
-    const orderDir = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const orderDir   = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
-    // Запрос с сортировкой
     const vals = await MetricValue.findAll({
       where,
       order: [[ orderField, orderDir ]],
       attributes: ['value','createdAt']
     });
 
-    // Только уникальные значения по порядку
+    // уникальные
     const seen = new Set();
     const unique = vals.filter(v => {
       if (seen.has(v.value)) return false;
@@ -427,10 +491,9 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
       return true;
     });
 
-    // Форматируем ответ
     res.json(unique.map(v => ({ value: v.value, date: v.createdAt })));
   } catch (err) {
-    console.error('GET /metrics/:id/values error', err);
+    console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -439,4 +502,4 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
 
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`Server on port ${PORT}`));

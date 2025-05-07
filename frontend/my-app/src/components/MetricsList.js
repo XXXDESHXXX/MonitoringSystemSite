@@ -1,3 +1,5 @@
+// src/components/MetricsList.js
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate }      from 'react-router-dom';
 import { getAbsoluteURL }   from '../utils/utils';
@@ -13,46 +15,70 @@ export default function MetricsList() {
   const [searchQuery, setSearchQuery]       = useState('');
   const navigate = useNavigate();
 
+  // 1) Загрузка всех тегов и трекнутых метрик
   useEffect(() => {
-    async function loadAll() {
+    async function loadInitial() {
       try {
-        const [allRes, trackedRes, tagsRes] = await Promise.all([
-          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics),    { credentials: 'include' }),
+        const [trackedRes, tagsRes] = await Promise.all([
           fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' }),
           fetch(getAbsoluteURL(API_ENDPOINTS.tags),           { credentials: 'include' }),
         ]);
-        const [all, tracked, tags] = await Promise.all([
-          allRes.json(), trackedRes.json(), tagsRes.json()
+        const [tracked, tags] = await Promise.all([
+          trackedRes.json(),
+          tagsRes.json(),
         ]);
-
-        setMetrics(Array.isArray(all) ? all : []);
         setAllTags(Array.isArray(tags) ? tags : []);
         const ids = (Array.isArray(tracked) ? tracked : [])
-          .map(x => typeof x === 'object' ? x.id : x);
+          .map(x => (typeof x === 'object' ? x.id : x));
         setTrackedIds(new Set(ids));
       } catch (err) {
-        console.error('Error loading data:', err);
+        console.error('Error loading initial data:', err);
       }
     }
-    loadAll();
+    loadInitial();
   }, []);
 
+  // 2) Каждый раз при изменении searchQuery или выбранных тегов запрашиваем отфильтрованный список
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim())   params.append('search', searchQuery.trim());
+    if (selectedTagIds.size)  params.append('tags', [...selectedTagIds].join(','));
+
+    fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { credentials: 'include' })
+      .then(res => {
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        setMetrics(Array.isArray(data) ? data : []);
+      })
+      .catch(err => {
+        console.error('Error fetching metrics:', err);
+        setMetrics([]);
+      });
+  }, [searchQuery, selectedTagIds]);
+
+  // 3) Тоггл трекинга
   const toggleTrack = async (metricId) => {
-    const isTracked = trackedIds.has(metricId);
-    const method    = isTracked ? 'DELETE' : 'POST';
-    const res       = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)),
-      { method, credentials: 'include' }
-    );
-    if (res.ok) {
+    const isOn = trackedIds.has(metricId);
+    const method = isOn ? 'DELETE' : 'POST';
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)),
+        { method, credentials: 'include' }
+      );
+      if (!res.ok) throw new Error(`Status ${res.status}`);
       setTrackedIds(prev => {
         const copy = new Set(prev);
-        isTracked ? copy.delete(metricId) : copy.add(metricId);
+        isOn ? copy.delete(metricId) : copy.add(metricId);
         return copy;
       });
+    } catch (err) {
+      console.error('Error toggling track:', err);
     }
   };
 
+  // 4) Выбор/снятие фильтра по тегу
   const toggleFilterTag = (tagId) => {
     setSelectedTagIds(prev => {
       const copy = new Set(prev);
@@ -60,17 +86,6 @@ export default function MetricsList() {
       return copy;
     });
   };
-
-  // Фильтрация по тегам + по поисковому запросу
-   useEffect(() => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.append('search', searchQuery);
-    if (selectedTagIds.size) params.append('tags', [...selectedTagIds].join(','));
-    fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { credentials: 'include' })
-      .then(res => res.json())
-      .then(setMetrics)
-      .catch(console.error);
-  }, [searchQuery, selectedTagIds]);
 
   return (
     <div className="metrics-page">
@@ -100,6 +115,7 @@ export default function MetricsList() {
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
+
         <ul className="metrics-list">
           {metrics.map(m => (
             <li key={m.id} className="metrics-item">
