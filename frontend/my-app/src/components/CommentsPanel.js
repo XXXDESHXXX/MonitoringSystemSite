@@ -33,10 +33,8 @@ export default function CommentsPanel({ metricId }) {
       }
     );
     if (res.ok) {
-      const created = await res.json();
-      created.userId = user.id;
-      created.user   = user.username;
-      setComments(prev => [...prev, created]);
+     const created = await res.json(); // просто добавляем ответ от сервера, он уже содержит userId и user
+        setComments(prev => [...prev, created]);
       setNewText('');
     }
   };

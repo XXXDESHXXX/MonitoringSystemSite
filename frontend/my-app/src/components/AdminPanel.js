@@ -1,18 +1,19 @@
-// src/components/AdminPanel.js
-
 import React, { useEffect, useState } from 'react';
-import { getAbsoluteURL }            from '../utils/utils';
-import { API_ENDPOINTS }             from '../constants';
+import { useAuth }                  from '../AuthContext';
+import { getAbsoluteURL }           from '../utils/utils';
+import { API_ENDPOINTS }            from '../constants';
 
 export default function AdminPanel() {
-  const [tags, setTags]   = useState([]);
-  const [users, setUsers] = useState([]);
-  // стейты форм…
+  const { user } = useAuth(); // Хуки всегда на верхнем уровне
+
+  const [tags, setTags]     = useState([]);
+  const [users, setUsers]   = useState([]);
   const [formTag, setFormTag]     = useState({ name: '', color: '#000000' });
   const [formUser, setFormUser]   = useState({ username: '', password: '', email: '', role: 'user' });
 
   useEffect(() => {
-    // подставляем правильный endpoint из констант
+    if (user?.role !== 'admin') return;
+
     fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), { credentials: 'include' })
       .then(r => r.json())
       .then(data => setTags(Array.isArray(data) ? data : []))
@@ -22,7 +23,7 @@ export default function AdminPanel() {
       .then(r => r.json())
       .then(data => setUsers(Array.isArray(data) ? data : []))
       .catch(() => setUsers([]));
-  }, []);
+  }, [user]);
 
   const addTag = async () => {
     const res = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), {
@@ -72,12 +73,22 @@ export default function AdminPanel() {
     }
   };
 
+  // Проверка прав — внутри JSX
+  if (user?.role !== 'admin') {
+    return (
+      <div className="admin-panel__no-access">
+        <h2>Доступ запрещён</h2>
+        <p>У вас нет прав для просмотра этой страницы.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-panel">
       <section>
         <h2>Теги</h2>
         <ul>
-          {(Array.isArray(tags) ? tags : []).map(t => (
+          {tags.map(t => (
             <li key={t.id}>
               {t.name} <button onClick={() => delTag(t.id)}>Удалить</button>
             </li>
@@ -99,7 +110,7 @@ export default function AdminPanel() {
       <section>
         <h2>Пользователи</h2>
         <ul>
-          {(Array.isArray(users) ? users : []).map(u => (
+          {users.map(u => (
             <li key={u.id}>
               {u.username} ({u.role})
               <button onClick={() => delUser(u.id)}>Удалить</button>

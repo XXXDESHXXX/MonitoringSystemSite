@@ -1,48 +1,33 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
+import { useNavigate }   from 'react-router-dom';
 import { getAbsoluteURL } from '../utils/utils';
-import { API_ENDPOINTS } from '../constants';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../AuthContext';
+import { API_ENDPOINTS }  from '../constants';
+import { useAuth }        from '../AuthContext';
 import './Auth.css';
 
 export default function Login() {
-  const { login } = useContext(AuthContext);
+  const { login } = useAuth();
+  const navigate  = useNavigate();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState(null);
-  const navigate = useNavigate();
+  const [message, setMessage]   = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
 
-    // Валидация полей
+    // Валидация на клиенте
     if (username.length > 16) {
-      setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
-      return;
+      return setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
     }
     if (password.length < 8 || password.length > 64) {
-      setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
-      return;
+      return setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
     }
 
     try {
-      const res = await fetch(getAbsoluteURL(API_ENDPOINTS.login), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      console.log('Response Status:', res.status);
-
-      if (res.ok) {
-        login();
-        navigate('/');
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || 'Login failed' });
-      }
+      await login(username, password);
+      navigate('/', { replace: true });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     }
@@ -77,7 +62,11 @@ export default function Login() {
         </label>
         <button className="auth-button" type="submit">Войти</button>
       </form>
-      {message && <div className={`auth-message ${message.type}`}>{message.text}</div>}
+      {message && (
+        <div className={`auth-message ${message.type}`}>
+          {message.text}
+        </div>
+      )}
     </div>
   );
 }

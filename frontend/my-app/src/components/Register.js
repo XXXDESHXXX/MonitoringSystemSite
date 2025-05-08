@@ -1,29 +1,27 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
+import { useNavigate }    from 'react-router-dom';
 import { getAbsoluteURL } from '../utils/utils';
-import { API_ENDPOINTS } from '../constants';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../AuthContext';
+import { API_ENDPOINTS }  from '../constants';
+import { useAuth }        from '../AuthContext';
 import './Auth.css';
 
 export default function Register() {
-  const { login } = useContext(AuthContext);
+  const { login } = useAuth();
+  const navigate  = useNavigate();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState(null);
-  const navigate = useNavigate();
+  const [message, setMessage]   = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
 
-    // Валидация полей
     if (username.length > 16) {
-      setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
-      return;
+      return setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
     }
     if (password.length < 8 || password.length > 64) {
-      setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
-      return;
+      return setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
     }
 
     try {
@@ -31,18 +29,17 @@ export default function Register() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password })
       });
 
-      console.log('Response Status:', res.status);
-
-      if (res.status === 201) {
-        login();
-        navigate('/');
-      } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || 'Registration failed' });
+      const data = await res.json().catch(() => ({}));
+      if (res.status !== 201) {
+        throw new Error(data.error || 'Registration failed');
       }
+
+      // После успешной регистрации сервер возвращает {id,username,role,email}
+      await login(username, password);
+      navigate('/', { replace: true });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     }
@@ -77,7 +74,11 @@ export default function Register() {
         </label>
         <button className="auth-button" type="submit">Зарегистрироваться</button>
       </form>
-      {message && <div className={`auth-message ${message.type}`}>{message.text}</div>}
+      {message && (
+        <div className={`auth-message ${message.type}`}>
+          {message.text}
+        </div>
+      )}
     </div>
   );
 }

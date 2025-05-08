@@ -1,35 +1,37 @@
 // src/App.js
 
-import React, { useContext } from 'react';
+import React, { useContext } from 'react'
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Link
-} from 'react-router-dom';
-import { FaHome, FaUserShield } from 'react-icons/fa';
-import Register               from './components/Register';
-import Login                  from './components/Login';
-import MetricsList            from './components/MetricsList';
-import LoadAverage            from './components/LoadAverage';
-import NodeCPUSecondsTotal    from './components/NodeCPUSecondsTotal';
-import NodeMemoryFreeBytes    from './components/NodeMemoryFreeBytes';
-import Favorites              from './components/Favorites';
-import AdminPanel             from './components/AdminPanel';
-import { AuthProvider, AuthContext } from './AuthContext';
-import ProtectedRoute         from './ProtectedRoute';
-import './App.css';
+} from 'react-router-dom'
+import { FaHome, FaUserShield } from 'react-icons/fa'
+
+import Register               from './components/Register'
+import Login                  from './components/Login'
+import MetricsList            from './components/MetricsList'
+import LoadAverage            from './components/LoadAverage'
+import NodeCPUSecondsTotal    from './components/NodeCPUSecondsTotal'
+import NodeMemoryFreeBytes    from './components/NodeMemoryFreeBytes'
+import Favorites              from './components/Favorites'
+import AdminPanel             from './components/AdminPanel'
+
+import { AuthProvider, AuthContext } from './AuthContext'
+import ProtectedRoute               from './ProtectedRoute'
+import './App.css'
 
 function Home() {
-  return <Favorites />;
+  return <Favorites />
 }
 
 function About() {
-  return <h2>О нас</h2>;
+  return <h2>О нас</h2>
 }
 
 function Navbar() {
-  const { isAuthenticated, user, logout } = useContext(AuthContext);
+  const { isAuthenticated, user, logout } = useContext(AuthContext)
 
   return (
     <nav className="navbar">
@@ -50,14 +52,16 @@ function Navbar() {
         ) : (
           <>
             <li className="nav-item">
-              <Link to="/about">О нас</Link>
+              <Link to="/about">О нас {user ? "+": "-"}</Link>
             </li>
             <li className="nav-item">
               <Link to="/metrics">Метрики</Link>
             </li>
             {user?.role === 'admin' && (
               <li className="nav-item">
-                <Link to="/admin"><FaUserShield className="icon" /> Админ</Link>
+                <Link to="/admin">
+                  <FaUserShield className="icon" /> Админ
+                </Link>
               </li>
             )}
             <li className="nav-item">
@@ -69,7 +73,7 @@ function Navbar() {
         )}
       </ul>
     </nav>
-  );
+  )
 }
 
 export default function App() {
@@ -88,6 +92,7 @@ export default function App() {
           />
           <Route path="/register" element={<Register />} />
           <Route path="/login"    element={<Login />} />
+
           <Route
             path="/about"
             element={
@@ -96,6 +101,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/metrics"
             element={
@@ -129,7 +135,7 @@ export default function App() {
             }
           />
 
-          {/* Админ‑панель доступна только авторизованным */}
+          {/* Админ-панель: только залогиненный с ролью admin */}
           <Route
             path="/admin"
             element={
@@ -139,10 +145,10 @@ export default function App() {
             }
           />
 
-          {/* Опционально: 404-фаллбек */}
+          {/* Фоллбек на 404 */}
           <Route path="*" element={<h2>Страница не найдена</h2>} />
         </Routes>
       </Router>
     </AuthProvider>
-  );
+  )
 }

@@ -12,6 +12,74 @@ import { ensureAdmin } from './middleware/admin.js';
 import adminRouter from './routes/admin.js';
 import db from './models/index.js';
 import { Server as SocketIO } from "socket.io";
+import nodemailer from 'nodemailer';
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: Number(process.env.SMTP_PORT) === 465, // true для 465, иначе false
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
+
+
+async function sendHourlyNotifications() {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  // берём все трекабельные метрики вместе с пользователем
+  const trackables = await Trackable.findAll({
+    where: {},
+    include: [
+      { model: User, attributes: ['email','username'] },
+      { model: Metric, attributes: ['name'] }
+    ]
+  });
+
+  for (let tr of trackables) {
+    const { User: user, Metric: metric } = tr;
+    if (!user.email) continue; // если нет почты — пропускаем
+
+    // находим последнее значение этой метрики за последний час
+    const latest = await MetricValue.findOne({
+      where: {
+        metric_id: tr.metric_id,
+        createdAt: { [Op.gte]: oneHourAgo }
+      },
+      order: [['createdAt','DESC']]
+    });
+
+    if (!latest) continue; // если за час не было записей — ничего не отправляем
+
+    // готовим текст письма
+    const subject = `Обновление метрики ${metric.name}`;
+    const text = `
+Привет, ${user.username}!
+
+За последний час метрика "${metric.name}" изменилась, последнее значение:
+  ${latest.value}
+  (время измерения: ${latest.createdAt.toLocaleString()})
+
+Спасибо, что пользуетесь нашим сервисом!
+`;
+
+    try {
+      await transporter.sendMail({
+        from: process.env.FROM_EMAIL,
+        to: user.email,
+        subject,
+        text
+      });
+      console.log(`[MAIL] Отправлено ${metric.name} -> ${user.email}`);
+    } catch (err) {
+      console.error(`[MAIL_ERROR] Не удалось отправить ${metric.name} пользователю ${user.email}:`, err);
+    }
+  }
+}
+
+
+setInterval(sendHourlyNotifications, 60 * 60 * 1000);
 
 // Модели
 import Metric from "./models/Metric.js";
@@ -54,7 +122,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
-app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
+app.use('/admin', ensureAdmin, adminRouter);
 // Socket.IO — подписка на комнаты по метрике
 io.on("connection", socket => {
   socket.on("subscribe", ({ metricId }) => {

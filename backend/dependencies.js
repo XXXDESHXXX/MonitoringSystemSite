@@ -1,51 +1,60 @@
+// src/dependencies.js
 import passport from "passport";
-import LocalStrategy from "passport-local";
+import { Strategy as LocalStrategy } from "passport-local";
 import User from "./models/User.js";
 import crypto from "crypto";
 
 function initializePassport() {
-    passport.use(new LocalStrategy(
-        function verify(username, password, cb) {
-            User.findOne({where: {username: username}})
-                .then(user => {
-                    if (!user) {
-                        return cb(null, false, {message: 'Incorrect username or password.'});
-                    }
-
-                    crypto.pbkdf2(password, user.salt, 310000, 32, 'sha256', function (err, hashedPassword) {
-                      if (err) {
-                        return cb(err);
-                      }
-                      // теперь сравниваем с user.password!
-                      if (!crypto.timingSafeEqual(user.password, hashedPassword)) {
-                        return cb(null, false, { message: 'Incorrect username or password.' });
-                      }
-
-                      return cb(null, user);
-                    });
-
-                })
-                .catch(err => {
-                    return cb(err);
-                });
+  passport.use(new LocalStrategy(
+    {
+      usernameField: 'username',
+      passwordField: 'password'
+    },
+    async function verify(username, password, done) {
+      try {
+        const user = await User.findOne({ where: { username } });
+        if (!user) {
+          return done(null, false, { message: 'Неверный логин или пароль.' });
         }
-    ));
 
-    // Сериализация пользователя в сессию
-    passport.serializeUser((user, cb) => {
-        cb(null, user.id);
-    });
+        // user.password хранится как Buffer (BLOB)
+        const userHash = Buffer.isBuffer(user.password)
+          ? user.password
+          : Buffer.from(user.password, 'binary');
 
-    // Десериализация пользователя из сессии
-    passport.deserializeUser((id, cb) => {
-        User.findByPk(id)
-            .then(user => {
-                cb(null, user);
-            })
-            .catch(err => {
-                cb(err);
-            });
-    });
+        crypto.pbkdf2(password, user.salt, 310000, 32, 'sha256', (err, hashedPassword) => {
+          if (err) return done(err);
+          // Сравниваем хэши безопасно
+          if (!crypto.timingSafeEqual(userHash, hashedPassword)) {
+            return done(null, false, { message: 'Неверный логин или пароль.' });
+          }
+          return done(null, user);
+        });
+      } catch (err) {
+        return done(err);
+      }
+    }
+  ));
+
+  // Сериализация — сохраняем в сессии только ID
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
+  // Десериализация — достаём из БД нужные поля, в том числе role
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const user = await User.findByPk(id, {
+        attributes: ['id', 'username', 'email', 'role']
+      });
+      if (!user) {
+        return done(new Error('Пользователь не найден в сессии'));
+      }
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
 }
 
 export { initializePassport, passport };
