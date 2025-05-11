@@ -119,6 +119,10 @@ export default function MetricsList() {
         <ul className="metrics-list">
           {metrics.map(m => (
             <li key={m.id} className="metrics-item">
+              <StarToggle
+                isOn={trackedIds.has(m.id)}
+                onToggle={() => toggleTrack(m.id)}
+              />
               <div
                 className="metrics-link"
                 onClick={() => navigate(`/metrics/${m.name.toLowerCase()}`)}
@@ -130,16 +134,15 @@ export default function MetricsList() {
                   <span
                     key={tag.id}
                     className="tag"
-                    style={{ backgroundColor: tag.color, color: '#000' }}
+                    style={{ 
+                      backgroundColor: tag.color,
+                      color: getContrastColor(tag.color)
+                    }}
                   >
                     {tag.name}
                   </span>
                 ))}
               </div>
-              <StarToggle
-                isOn={trackedIds.has(m.id)}
-                onToggle={() => toggleTrack(m.id)}
-              />
             </li>
           ))}
           {metrics.length === 0 && (
@@ -150,3 +153,20 @@ export default function MetricsList() {
     </div>
   );
 }
+// Helper function to determine text color based on background color
+function getContrastColor(hexColor) {
+  // Remove the hash if it exists
+  const color = hexColor.replace('#', '');
+  
+  // Convert to RGB
+  const r = parseInt(color.substr(0, 2), 16);
+  const g = parseInt(color.substr(2, 2), 16);
+  const b = parseInt(color.substr(4, 2), 16);
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return black or white based on luminance
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+

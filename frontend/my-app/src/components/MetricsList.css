@@ -3,167 +3,178 @@
 /* -------------------------------------------------- */
 .metrics-page {
   display: flex;
-  gap: 20px;
+  gap: 30px;
+  padding: 20px;
+  min-height: 100vh;
+  background: #f5f7fa;
 }
 
 /* -------------------------------------------------- */
 /* Левая панель с фильтром по тегам                   */
 /* -------------------------------------------------- */
 .tag-sidebar {
-  width: 200px;
-  padding: 10px;
-  background: #fafafa;
-  border-radius: 8px;
-  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+  width: 250px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
 }
+
 .tag-sidebar h2 {
-  font-size: 1.2rem;
-  margin-bottom: 10px;
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  color: #2c3e50;
+  font-weight: 600;
 }
+
 .tag-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
 .tag-item {
-  padding: 6px 10px;
-  margin-bottom: 6px;
-  border-radius: 4px;
+  padding: 10px 15px;
+  border-radius: 8px;
   cursor: pointer;
-  background: #eee;
-  transition: background 0.2s;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  color: #4a5568;
+  border: 1px solid #e2e8f0;
 }
+
 .tag-item:hover {
-  background: #ddd;
+  background: #edf2f7;
+  transform: translateX(4px);
 }
+
 .tag-item.selected {
-  background: #007bff;
-  color: #fff;
+  background: #4299e1;
+  color: white;
+  border-color: #4299e1;
 }
 
 /* -------------------------------------------------- */
 /* Правая панель — заголовок, поиск и список метрик    */
 /* -------------------------------------------------- */
 .metrics-main {
-  flex: 1;            /* занимает всё оставшееся место */
+  flex: 1;
   display: flex;
   flex-direction: column;
-}
-
-/* Убрали жёсткое ограничение ширины и центрирование */
-.metrics-container {
-  width: 100%;       /* растягивается на всю ширину .metrics-main */
-  max-width: none;   /* отменяем прежнее max-width:600px */
-  margin: 0;         /* убираем margin:auto */
-  padding: 20px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  box-sizing: border-box;
+  gap: 24px;
 }
 
 .metrics-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 .metrics-title {
   font-size: 2rem;
-  color: #333;
+  color: #2c3e50;
+  font-weight: 600;
+  margin: 0;
 }
 
 .metrics-search {
-  padding: 6px 10px;
+  padding: 12px 20px;
   font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 200px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  width: 300px;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+}
+
+.metrics-search:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
 }
 
 .metrics-list {
   list-style: none;
   padding: 0;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  flex: 1;             /* чтобы список разрастался в .metrics-container */
-  overflow-y: auto;    /* при большом количестве метрик скролл */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
 }
 
 .metrics-item {
-  padding: 12px;
-  background: #f7f7f7;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-  color: #333;
-  font-size: 1.1rem;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
 }
 
 .metrics-item:hover {
-  background: #e0e0e0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
 
 .metrics-link {
-  flex-grow: 1;
+  font-size: 1.2rem;
+  color: #2c3e50;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease;
 }
 
-/* -------------------------------------------------- */
-/* Теги внутри каждого элемента                       */
-/* -------------------------------------------------- */
+.metrics-link:hover {
+  color: #4299e1;
+}
+
 .metrics-tags {
   display: flex;
-  gap: 6px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  gap: 8px;
 }
 
 .tag {
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: 8px;
-  white-space: nowrap;
-  /* цвет фона и текста задаются инлайн из React:
-     <span style={{ backgroundColor: tag.color, color: '#000' }}> */
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-/* -------------------------------------------------- */
-/* Пустой результат поиска                           */
-/* -------------------------------------------------- */
 .no-results {
-  padding: 12px;
+  grid-column: 1 / -1;
   text-align: center;
-  color: #777;
-}
-
-
-/* Убедитесь, что .metrics-item — flex-контейнер */
-.metrics-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between; /* название+звезда слева, теги или что-то ещё — справа */
-  padding: 12px;
-  background: #f7f7f7;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-  color: #333;
+  padding: 40px;
+  background: white;
+  border-radius: 12px;
+  color: #718096;
   font-size: 1.1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
-/* Специальный класс для обёртки названия и звезды */
-.metrics-item .title-with-star {
-  display: flex;
-  align-items: center;
-  /* Теперь название и звезда в одном блоке */
-}
-
-/* Добавляем отступ у звёздочки */
+/* Star toggle styles */
 .star-toggle {
-  margin-left: 8px; /* подберите то, что вам нравится */
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.star-toggle:hover {
+  transform: scale(1.1);
 }

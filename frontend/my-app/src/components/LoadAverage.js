@@ -25,14 +25,19 @@ export default function LoadAverage() {
     let cancelled = false;
     async function fetchData() {
       setStatus(null);
+      console.log('Fetching load average data...');
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.loadAverage),
         { credentials: 'include' }
       );
       if (cancelled) return;
       setStatus(res.status);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.error('Failed to fetch load average:', res.status);
+        return;
+      }
       const json = await res.json();
+      console.log('Received data:', json);
       if (typeof json.load_average === 'number') {
         setLoad((json.load_average * 100).toFixed(2));
       }
@@ -45,16 +50,19 @@ export default function LoadAverage() {
     };
   }, [initialized]);
 
-  if (!initialized) return null;
+  if (!initialized) {
+    console.log('Component not initialized yet');
+    return null;
+  }
 
   return (
     <div className="metric-container">
       <div className="metric-header">
         <StarToggle isOn={isTracked} onToggle={toggleTracking} />
-        <h1 className="title">Показатель: Load Average</h1>
+        <h1 className="title">Метрика: Load Average</h1>
       </div>
       <p className="description">
-        Средняя нагрузка на процессор: процессы в состоянии D, R и I/O за 1 минуту.
+        Средняя нагрузка на процессор за последнюю минуту.
       </p>
       <div className="metric-status">
         <RequestIndicator statusCode={status} />

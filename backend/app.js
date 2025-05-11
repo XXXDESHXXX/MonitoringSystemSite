@@ -122,7 +122,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
-app.use('/admin', ensureAdmin, adminRouter);
+app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 // Socket.IO — подписка на комнаты по метрике
 io.on("connection", socket => {
   socket.on("subscribe", ({ metricId }) => {
@@ -171,6 +171,14 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
       Metric.findOrCreate({ where: { name: 'LOAD_AVERAGE' } }),
       Metric.findOrCreate({ where: { name: 'NODE_CPU_SECONDS_TOTAL' } }),
       Metric.findOrCreate({ where: { name: 'NODE_MEMORY_MEMFREE_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_TOTAL_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_CPU_USAGE_PERCENT' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_DISK_READ_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_DISK_WRITE_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_CACHED_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_DISK_IO_TIME' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_NETWORK_RECEIVE' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_UPTIME' } }),
     ]);
 
     // 2) Считаем параметры из query
@@ -286,6 +294,182 @@ app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, r
   }
 });
 
+// New endpoint for total memory
+app.get('/metrics/node_memory_total_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_MEMORY_TOTAL_BYTES' },
+      defaults: { name: 'NODE_MEMORY_TOTAL_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_memory_MemTotal_bytes');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_memory_MemTotal_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for CPU usage percentage
+app.get('/metrics/node_cpu_usage_percent', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_CPU_USAGE_PERCENT' },
+      defaults: { name: 'NODE_CPU_USAGE_PERCENT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_cpu_usage_percent: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for disk read bytes
+app.get('/metrics/node_disk_read_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_DISK_READ_BYTES' },
+      defaults: { name: 'NODE_DISK_READ_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_disk_read_bytes_total');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_disk_read_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for disk write bytes
+app.get('/metrics/node_disk_write_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_DISK_WRITE_BYTES' },
+      defaults: { name: 'NODE_DISK_WRITE_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_disk_written_bytes_total');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_disk_write_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for memory cached bytes
+app.get('/metrics/node_memory_cached_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_MEMORY_CACHED_BYTES' },
+      defaults: { name: 'NODE_MEMORY_CACHED_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_memory_Cached_bytes');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_memory_cached_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for disk IO time
+app.get('/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_DISK_IO_TIME' },
+      defaults: { name: 'NODE_DISK_IO_TIME' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_disk_io_time_seconds_total');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_disk_io_time: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Network Receive metric
+app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_NETWORK_RECEIVE' },
+      defaults: { name: 'NODE_NETWORK_RECEIVE' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_network_receive_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for system uptime
+app.get('/metrics/node_uptime', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_UPTIME' },
+      defaults: { name: 'NODE_UPTIME' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_time_seconds - node_boot_time_seconds');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_uptime: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
 app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = req.params.metric_id;
@@ -387,34 +571,30 @@ app.get('/tags', ensureAuthenticated, async (req, res) => {
 
 
 app.get('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
-  try {
-    const metricId = req.params.metric_id;
-    // проверяем, что метрика есть
-    const metric = await Metric.findByPk(metricId);
-    if (!metric) return res.status(404).json({ error: 'Metric not found' });
+  const metricId = +req.params.metric_id;
+  const days = parseInt(req.query.days, 10);
 
-    // достаём комментарии вместе с автором
-    const comments = await Comment.findAll({
-      where: { metric_id: metricId },
-      include: [{ model: User, attributes: ['id','username'] }],
-      order: [['createdAt','ASC']]
-    });
-
-    // форматируем
-    const result = comments.map(c => ({
-      id: c.id,
-      text: c.comment,
-      user: c.User.username,
-      userId: c.User.id,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt
-    }));
-
-    res.json(result);
-  } catch (err) {
-    console.error('GET /metrics/:id/comments error', err);
-    res.status(500).json({ error: 'Internal server error' });
+  const where = { metric_id: metricId };
+  if (!isNaN(days) && days > 0) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    where.createdAt = { [Op.gte]: since };
   }
+
+  const comments = await Comment.findAll({
+    where,
+    include: [{ model: User, attributes: ['id','username'] }],
+    order: [['createdAt','ASC']]
+  });
+
+  const result = comments.map(c => ({
+    id: c.id,
+    text: c.comment,
+    user: c.User.username,
+    userId: c.User.id,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt
+  }));
+  res.json(result);
 });
 
 // POST /metrics/:metric_id/comments
@@ -529,6 +709,23 @@ setInterval(
   () => fetchAndEmit("NODE_MEMORY_MEMFREE_BYTES", "node_memory_MemFree_bytes"),
   5000
 );
+
+// Add new interval fetches for the new metrics
+setInterval(
+  () => fetchAndEmit("NODE_MEMORY_TOTAL_BYTES", "node_memory_MemTotal_bytes"),
+  5000
+);
+
+setInterval(
+  () => fetchAndEmit("NODE_CPU_USAGE_PERCENT", "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"),
+  5000
+);
+
+setInterval(
+  () => fetchAndEmit("NODE_DISK_READ_BYTES", "node_disk_read_bytes_total"),
+  5000
+);
+
 // HTTP-эндпоинт для истории без realtime (для initial load)
 app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   try {

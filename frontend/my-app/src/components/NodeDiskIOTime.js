@@ -5,10 +5,10 @@ import RequestIndicator      from './RequestIndicator';
 import StarToggle            from './StarToggle';
 import useMetricTracking     from '../hooks/useMetricTracking';
 import CommentsPanel         from './CommentsPanel';
+import ValueHistoryPanel     from './ValueHistoryPanel';
 import '../index.css';
-import ValueHistoryPanel from './ValueHistoryPanel';
 
-export default function NodeMemoryFreeBytes() {
+export default function NodeDiskIOTime() {
   const [value, setValue]     = useState(null);
   const [status, setStatus]   = useState(null);
 
@@ -17,7 +17,7 @@ export default function NodeMemoryFreeBytes() {
     isTracked,
     toggleTracking,
     initialized
-  } = useMetricTracking('NODE_MEMORY_MEMFREE_BYTES');
+  } = useMetricTracking('NODE_DISK_IO_TIME');
 
   useEffect(() => {
     if (!initialized) return;
@@ -26,16 +26,15 @@ export default function NodeMemoryFreeBytes() {
     async function fetchData() {
       setStatus(null);
       const res = await fetch(
-        getAbsoluteURL(API_ENDPOINTS.memFreeBytes),
+        getAbsoluteURL(API_ENDPOINTS.diskIOTime),
         { credentials: 'include' }
       );
       if (cancelled) return;
       setStatus(res.status);
       if (!res.ok) return;
       const json = await res.json();
-      if (typeof json.node_memory_MemFree_bytes === 'number') {
-        // Convert bytes to GB for better readability
-        setValue((json.node_memory_MemFree_bytes / (1024 * 1024 * 1024)).toFixed(2));
+      if (typeof json.node_disk_io_time === 'number') {
+        setValue(json.node_disk_io_time.toFixed(2));
       }
     }
 
@@ -53,21 +52,20 @@ export default function NodeMemoryFreeBytes() {
     <div className="metric-container">
       <div className="metric-header">
         <StarToggle isOn={isTracked} onToggle={toggleTracking} />
-        <h1 className="title">Метрика: Free Memory</h1>
+        <h1 className="title">Метрика: Disk IO Time</h1>
       </div>
       <p className="description">
-        Количество свободной оперативной памяти в системе.
+        Время, затраченное на операции ввода-вывода диска.
       </p>
       <div className="metric-status">
         <RequestIndicator statusCode={status} />
         <span className="metric-value">
-          Значение: {value != null ? `${value} GB` : '—'}
+          Значение: {value != null ? `${value} сек` : '—'}
         </span>
       </div>
 
-      {/* Панель комментариев */}
       <CommentsPanel metricId={metricId} />
       <ValueHistoryPanel metricId={metricId} />
     </div>
   );
-}
+} 

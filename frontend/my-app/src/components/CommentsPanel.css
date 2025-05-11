@@ -137,3 +137,67 @@
   background: #218838;
   transform: translateY(-1px);
 }
+
+.comments-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.comments-filter,
+.comments-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comments-filter label,
+.comments-sort label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #586069;
+  font-size: 0.9rem;
+}
+
+.comments-filter select,
+.comments-sort select {
+  padding: 6px 12px;
+  border: 1px solid #d1d5da;
+  border-radius: 4px;
+  background: white;
+  color: #24292e;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.comments-filter select:hover,
+.comments-sort select:hover {
+  border-color: #0366d6;
+}
+
+.comments-filter select:focus,
+.comments-sort select:focus {
+  outline: none;
+  border-color: #0366d6;
+  box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+}
+
+.sort-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #586069;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.sort-icon:hover {
+  color: #0366d6;
+}

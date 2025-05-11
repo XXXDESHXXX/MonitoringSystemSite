@@ -1,25 +1,47 @@
 // src/components/CommentsPanel.js
-import React, {useContext, useEffect, useState} from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaEdit, FaTrash, FaCheck } from 'react-icons/fa';
-import { getAbsoluteURL }   from '../utils/utils';
-import { API_ENDPOINTS }    from '../constants';
-import { AuthContext }      from '../AuthContext';
+import { FaEdit, FaTrash, FaCheck, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
+import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
+import { AuthContext } from '../AuthContext';
 import './CommentsPanel.css';
+
+const FILTER_OPTIONS = [
+  { label: 'Все', value: '' },
+  { label: 'За день', value: '1' },
+  { label: 'За неделю', value: '7' },
+  { label: 'За месяц', value: '30' }
+];
+
+const SORT_OPTIONS = [
+  { label: 'Сначала новые', value: 'desc' },
+  { label: 'Сначала старые', value: 'asc' }
+];
 
 export default function CommentsPanel({ metricId }) {
   const { user } = useContext(AuthContext);
   const [comments, setComments] = useState([]);
-  const [newText, setNewText]   = useState('');
+  const [newText, setNewText] = useState('');
+  const [filterDays, setFilterDays] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   useEffect(() => {
-    fetch(getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)), {
+    const params = filterDays ? `?days=${filterDays}` : '';
+    fetch(getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId) + params), {
       credentials: 'include'
     })
-    .then(res => res.json())
-    .then(setComments)
-    .catch(console.error);
-  }, [metricId]);
+      .then(res => res.json())
+      .then(data => {
+        const sorted = [...data].sort((a, b) => {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        });
+        setComments(sorted);
+      })
+      .catch(console.error);
+  }, [metricId, filterDays, sortOrder]);
 
   const addComment = async () => {
     if (!newText.trim()) return;
@@ -28,13 +50,17 @@ export default function CommentsPanel({ metricId }) {
       {
         method: 'POST',
         credentials: 'include',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: newText.trim() })
       }
     );
     if (res.ok) {
-     const created = await res.json(); // просто добавляем ответ от сервера, он уже содержит userId и user
-        setComments(prev => [...prev, created]);
+      const created = await res.json();
+      setComments(prev => [{
+        ...created,
+        user: user.username,
+        userId: user.id
+      }, ...prev]);
       setNewText('');
     }
   };
@@ -45,7 +71,7 @@ export default function CommentsPanel({ metricId }) {
       {
         method: 'PUT',
         credentials: 'include',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text.trim() })
       }
     );
@@ -70,17 +96,52 @@ export default function CommentsPanel({ metricId }) {
   return (
     <div className="comments-panel">
       <h3>Комментарии</h3>
-      <div className="comments-list">
-        {comments.map(c => (
-          <CommentItem
-            key={c.id}
-            comment={c}
-            isOwn={user && c.userId === user.id}
-            onSave={saveComment}
-            onDelete={deleteComment}
-          />
-        ))}
+
+      <div className="comments-controls">
+        <div className="comments-filter">
+          <label>
+            Показывать:&nbsp;
+            <select value={filterDays} onChange={e => setFilterDays(e.target.value)}>
+              {FILTER_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="comments-sort">
+          <label>
+            Сортировка:&nbsp;
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+          <motion.span 
+            className="sort-icon"
+            animate={{ rotate: sortOrder === 'asc' ? 180 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {sortOrder === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />}
+          </motion.span>
+        </div>
       </div>
+
+      <div className="comments-list">
+        <AnimatePresence>
+          {comments.map(c => (
+            <CommentItem
+              key={c.id}
+              comment={c}
+              isOwn={user && c.userId === user.id}
+              onSave={saveComment}
+              onDelete={deleteComment}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+
       <div className="comment-add">
         <textarea
           rows={2}
@@ -98,7 +159,7 @@ export default function CommentsPanel({ metricId }) {
 
 function CommentItem({ comment, isOwn, onSave, onDelete }) {
   const [editing, setEditing] = useState(false);
-  const [text, setText]       = useState(comment.text);
+  const [text, setText] = useState(comment.text);
 
   return (
     <div className="comment-item">
@@ -109,44 +170,17 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
         </span>
         {isOwn && (
           <div className="comment-controls">
-            <AnimatePresence>
-              {!editing && (
-                <motion.span
-                  className="icon-button"
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  transition={{ duration: 0.2 }}
-                  onClick={() => setEditing(true)}
-                >
-                  <FaEdit />
-                </motion.span>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {editing && (
-                <motion.span
-                  className="icon-button check-button"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  onClick={() => {
-                    onSave(comment.id, text);
-                    setEditing(false);
-                  }}
-                >
-                  <FaCheck />
-                </motion.span>
-              )}
-            </AnimatePresence>
-
-            <motion.span
-              className="icon-button"
-              whileHover={{ rotate: 90 }}
-              onClick={() => onDelete(comment.id)}
-            >
+            {!editing && (
+              <motion.span className="icon-button" whileHover={{ scale: 1.2 }} onClick={() => setEditing(true)}>
+                <FaEdit />
+              </motion.span>
+            )}
+            {editing && (
+              <motion.span className="icon-button check-button" whileHover={{ scale: 1.2 }} onClick={() => { onSave(comment.id, text); setEditing(false); }}>
+                <FaCheck />
+              </motion.span>
+            )}
+            <motion.span className="icon-button" whileHover={{ rotate: 90 }} onClick={() => onDelete(comment.id)}>
               <FaTrash />
             </motion.span>
           </div>

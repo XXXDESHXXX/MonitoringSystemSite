@@ -1,0 +1,217 @@
+/* src/components/AdminPanel.css */
+
+.admin-panel {
+  padding: 2rem;
+  background: #f5f7fa;
+  min-height: 100vh;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.admin-panel__header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.admin-panel__header h1 {
+  font-size: 2.5rem;
+  color: #333;
+  animation: fadeInDown 0.6s ease-out;
+}
+
+/* Сетки */
+.admin-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+@media (min-width: 768px) {
+  .admin-panel__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.admin-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+  padding: 1.5rem;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.admin-section h2 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  color: #444;
+}
+
+/* Списки */
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.admin-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  transition: background 0.2s, transform 0.2s;
+  cursor: default;
+}
+.admin-list-item:hover {
+  background: #f0f4f8;
+  transform: translateY(-2px);
+}
+
+/* Кнопки */
+.btn-delete {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.btn-delete:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+/* Анимации */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Добавьте в src/components/AdminPanel.css */
+
+.tag-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tag-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.tag-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.btn-add {
+  padding: 0.5rem 0.75rem;
+  background: #2ecc71;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.btn-add:hover {
+  background: #27ae60;
+  transform: scale(1.05);
+}
+
+/* Бейдж роли */
+.role-badge {
+  margin-left: 0.5rem;
+  background: #eee;
+  color: #555;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+/* Дополнения к src/components/AdminPanel.css */
+
+/* Список метрик */
+.metric-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.metric-item .metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.metric-tags {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+/* Кнопки-тогглы */
+.tags-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tag-toggle-btn {
+  padding: 0.25rem 0.5rem;
+  border: 2px solid;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tag-toggle-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.tag-toggle-btn.active {
+  background: currentColor;
+  color: white;
+}
+
+/* Color picker в форме */
+.color-picker {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+
+/* Поисковые поля */
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+.search-input:focus {
+  border-color: #3498db;
+  outline: none;
+}

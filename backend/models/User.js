@@ -23,7 +23,8 @@ const User = sequelize.define('User', {
   },
   email: {
     type: DataTypes.STRING,
-    validate: { isEmail: true }
+    validate: { isEmail: true },
+    unique: true
   },
   role: {
     type: DataTypes.ENUM('user','admin'),

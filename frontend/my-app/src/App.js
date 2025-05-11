@@ -7,7 +7,7 @@ import {
   Route,
   Link
 } from 'react-router-dom'
-import { FaHome, FaUserShield } from 'react-icons/fa'
+import { FaHome, FaUserShield, FaCog } from 'react-icons/fa'
 
 import Register               from './components/Register'
 import Login                  from './components/Login'
@@ -15,8 +15,18 @@ import MetricsList            from './components/MetricsList'
 import LoadAverage            from './components/LoadAverage'
 import NodeCPUSecondsTotal    from './components/NodeCPUSecondsTotal'
 import NodeMemoryFreeBytes    from './components/NodeMemoryFreeBytes'
+import NodeMemoryTotalBytes   from './components/NodeMemoryTotalBytes'
+import NodeCPUUsagePercent    from './components/NodeCPUUsagePercent'
+import NodeDiskReadBytes      from './components/NodeDiskReadBytes'
+import NodeDiskWriteBytes     from './components/NodeDiskWriteBytes'
+import NodeMemoryCachedBytes  from './components/NodeMemoryCachedBytes'
+import NodeDiskIOTime         from './components/NodeDiskIOTime'
+import NodeUptime             from './components/NodeUptime'
 import Favorites              from './components/Favorites'
 import AdminPanel             from './components/AdminPanel'
+import EmailSettings          from './components/EmailSettings'
+import NodeNetworkTransmit    from './components/NodeNetworkTransmit'
+import NodeNetworkReceive     from './components/NodeNetworkReceive'
 
 import { AuthProvider, AuthContext } from './AuthContext'
 import ProtectedRoute               from './ProtectedRoute'
@@ -32,6 +42,7 @@ function About() {
 
 function Navbar() {
   const { isAuthenticated, user, logout } = useContext(AuthContext)
+  const [settingsOpen, setSettingsOpen] = React.useState(false)
 
   return (
     <nav className="navbar">
@@ -52,9 +63,6 @@ function Navbar() {
         ) : (
           <>
             <li className="nav-item">
-              <Link to="/about">О нас {user ? "+": "-"}</Link>
-            </li>
-            <li className="nav-item">
               <Link to="/metrics">Метрики</Link>
             </li>
             {user?.role === 'admin' && (
@@ -65,6 +73,11 @@ function Navbar() {
               </li>
             )}
             <li className="nav-item">
+              <button className="settings-button" onClick={() => setSettingsOpen(true)}>
+                <FaCog className="icon" /> Настройки
+              </button>
+            </li>
+            <li className="nav-item">
               <button onClick={logout} className="logout-button">
                 Выйти
               </button>
@@ -72,6 +85,7 @@ function Navbar() {
           </>
         )}
       </ul>
+      <EmailSettings isOpen={settingsOpen} setIsOpen={setSettingsOpen} />
     </nav>
   )
 }
@@ -131,6 +145,78 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <NodeMemoryFreeBytes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_memory_total_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeMemoryTotalBytes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_cpu_usage_percent"
+            element={
+              <ProtectedRoute>
+                <NodeCPUUsagePercent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_disk_read_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeDiskReadBytes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_disk_write_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeDiskWriteBytes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_memory_cached_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeMemoryCachedBytes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_disk_io_time"
+            element={
+              <ProtectedRoute>
+                <NodeDiskIOTime />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_uptime"
+            element={
+              <ProtectedRoute>
+                <NodeUptime />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_network_transmit_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeNetworkTransmit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_network_receive_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeNetworkReceive />
               </ProtectedRoute>
             }
           />

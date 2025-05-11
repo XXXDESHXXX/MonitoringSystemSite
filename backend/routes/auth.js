@@ -59,4 +59,48 @@ router.post('/logout', (req, res) => {
   });
 });
 
+// Обновление настроек пользователя
+router.put('/settings', ensureAuthenticated, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Обновляем только если email валидный
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      // Проверяем, не занят ли email другим пользователем
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser && existingUser.id !== user.id) {
+        return res.status(400).json({ error: 'This email is already in use' });
+      }
+
+      user.email = email;
+    }
+
+    await user.save();
+
+    // Возвращаем обновленные данные пользователя
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    });
+  } catch (err) {
+    console.error('Error updating user settings:', err);
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'This email is already in use' });
+    }
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
 export default router;

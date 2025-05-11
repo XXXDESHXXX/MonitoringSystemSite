@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
   if (checking) return null; // или спиннер
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );
