@@ -26,7 +26,6 @@ import Favorites              from './components/Favorites'
 import AdminPanel             from './components/AdminPanel'
 import EmailSettings          from './components/EmailSettings'
 import NodeNetworkTransmit    from './components/NodeNetworkTransmit'
-import NodeNetworkReceive     from './components/NodeNetworkReceive'
 
 import { AuthProvider, AuthContext } from './AuthContext'
 import ProtectedRoute               from './ProtectedRoute'
@@ -209,14 +208,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <NodeNetworkTransmit />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/metrics/node_network_receive_bytes"
-            element={
-              <ProtectedRoute>
-                <NodeNetworkReceive />
               </ProtectedRoute>
             }
           />

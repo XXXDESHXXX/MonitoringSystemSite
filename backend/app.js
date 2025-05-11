@@ -177,7 +177,6 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
       Metric.findOrCreate({ where: { name: 'NODE_DISK_WRITE_BYTES' } }),
       Metric.findOrCreate({ where: { name: 'NODE_MEMORY_CACHED_BYTES' } }),
       Metric.findOrCreate({ where: { name: 'NODE_DISK_IO_TIME' } }),
-      Metric.findOrCreate({ where: { name: 'NODE_NETWORK_RECEIVE' } }),
       Metric.findOrCreate({ where: { name: 'NODE_UPTIME' } }),
     ]);
 
@@ -418,28 +417,6 @@ app.get('/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
       const val = parseFloat(data.data.result[0].value[1]);
       if (track) await MetricValue.create({ value: val, metric_id: metric.id });
       return res.json({ node_disk_io_time: val });
-    }
-    res.status(500).json({ error: 'No data returned from Prometheus' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch data' });
-  }
-});
-
-// Network Receive metric
-app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
-  try {
-    const [metric] = await Metric.findOrCreate({
-      where: { name: 'NODE_NETWORK_RECEIVE' },
-      defaults: { name: 'NODE_NETWORK_RECEIVE' }
-    });
-    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
-    const data = await response.json();
-    if (data.status === 'success' && data.data.result.length > 0) {
-      const val = parseFloat(data.data.result[0].value[1]);
-      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
-      return res.json({ node_network_receive_bytes: val });
     }
     res.status(500).json({ error: 'No data returned from Prometheus' });
   } catch (error) {
@@ -763,8 +740,16 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   }
 });
 
-
-
+app.get('/metrics/node_network_transmit_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=rate(node_network_transmit_bytes_total[1m])`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching network transmit data:', error);
+    res.status(500).json({ error: 'Failed to fetch network transmit data' });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log(`Server on port ${PORT}`));
