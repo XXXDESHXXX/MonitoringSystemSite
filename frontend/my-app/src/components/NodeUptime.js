@@ -26,7 +26,7 @@ export default function NodeUptime() {
     async function fetchData() {
       setStatus(null);
       const res = await fetch(
-        getAbsoluteURL(API_ENDPOINTS.nodeUptime),
+        getAbsoluteURL(API_ENDPOINTS.uptime),
         { credentials: 'include' }
       );
       if (cancelled) return;

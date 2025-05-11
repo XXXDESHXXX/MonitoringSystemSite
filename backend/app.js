@@ -106,13 +106,13 @@ app.use(express.json());
 // Сессии с куки для кросс-доменных запросов
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
+  resave: true,
+  saveUninitialized: true,
   cookie: {
-    sameSite: 'lax',  // разрешаем отправку куки с фронта на порт 5000
+    sameSite: 'lax',
     secure: false,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 100
+    maxAge: 24 * 60 * 60 * 1000 // 24 часа
   }
 }));
 

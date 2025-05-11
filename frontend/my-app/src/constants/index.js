@@ -25,7 +25,7 @@ export const API_ENDPOINTS = {
   diskReadBytes: '/metrics/node_disk_read_bytes',
   diskWriteBytes: '/metrics/node_disk_write_bytes',
   memCachedBytes: '/metrics/node_memory_cached_bytes',
-  diskIO: '/metrics/node_disk_io_time',
+  diskIOTime: '/metrics/node_disk_io_time',
   uptime: '/metrics/node_uptime',
   networkTransmit: '/metrics/node_network_transmit_bytes',
   tags: '/tags',

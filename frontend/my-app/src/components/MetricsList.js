@@ -7,12 +7,15 @@ import { API_ENDPOINTS }    from '../constants';
 import StarToggle           from './StarToggle';
 import './MetricsList.css';
 
+const METRICS_PER_PAGE = 9;
+
 export default function MetricsList() {
   const [metrics, setMetrics]               = useState([]);
   const [allTags, setAllTags]               = useState([]);
   const [trackedIds, setTrackedIds]         = useState(new Set());
   const [selectedTagIds, setSelectedTagIds] = useState(new Set());
   const [searchQuery, setSearchQuery]       = useState('');
+  const [currentPage, setCurrentPage]       = useState(1);
   const navigate = useNavigate();
 
   // 1) Загрузка всех тегов и трекнутых метрик
@@ -87,6 +90,22 @@ export default function MetricsList() {
     });
   };
 
+  // Фильтрация метрик по тегам
+  const filteredMetrics = metrics.filter(m => {
+    // Если теги не выбраны, показываем все метрики
+    if (!selectedTagIds.size) return true;
+
+    // Проверяем, что метрика содержит ВСЕ выбранные теги
+    return [...selectedTagIds].every(selectedTag => 
+      m.tags.some(tag => tag.id === selectedTag)
+    );
+  });
+
+  // Пагинация
+  const totalPages = Math.ceil(filteredMetrics.length / METRICS_PER_PAGE);
+  const startIndex = (currentPage - 1) * METRICS_PER_PAGE;
+  const paginatedMetrics = filteredMetrics.slice(startIndex, startIndex + METRICS_PER_PAGE);
+
   return (
     <div className="metrics-page">
       <aside className="tag-sidebar">
@@ -117,7 +136,7 @@ export default function MetricsList() {
         </div>
 
         <ul className="metrics-list">
-          {metrics.map(m => (
+          {paginatedMetrics.map(m => (
             <li key={m.id} className="metrics-item">
               <StarToggle
                 isOn={trackedIds.has(m.id)}
@@ -145,10 +164,30 @@ export default function MetricsList() {
               </div>
             </li>
           ))}
-          {metrics.length === 0 && (
+          {paginatedMetrics.length === 0 && (
             <li className="no-results">Ничего не найдено.</li>
           )}
         </ul>
+
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Назад
+            </button>
+            <span className="page-info">
+              Страница {currentPage} из {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Вперед
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );
