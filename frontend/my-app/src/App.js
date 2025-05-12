@@ -22,10 +22,14 @@ import NodeDiskWriteBytes     from './components/NodeDiskWriteBytes'
 import NodeMemoryCachedBytes  from './components/NodeMemoryCachedBytes'
 import NodeDiskIOTime         from './components/NodeDiskIOTime'
 import NodeUptime             from './components/NodeUptime'
+import NodeNetworkTransmit    from './components/NodeNetworkTransmit'
+import NodeNetworkReceive     from './components/NodeNetworkReceive'
+import NodeDiskUsagePercent   from './components/NodeDiskUsagePercent'
+import NodeMemoryUsagePercent from './components/NodeMemoryUsagePercent'
+import NodeProcessCount       from './components/NodeProcessCount'
 import Favorites              from './components/Favorites'
 import AdminPanel             from './components/AdminPanel'
 import EmailSettings          from './components/EmailSettings'
-import NodeNetworkTransmit    from './components/NodeNetworkTransmit'
 
 import { AuthProvider, AuthContext } from './AuthContext'
 import ProtectedRoute               from './ProtectedRoute'
@@ -208,6 +212,38 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <NodeNetworkTransmit />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_network_receive_bytes"
+            element={
+              <ProtectedRoute>
+                <NodeNetworkReceive />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_disk_usage_percent"
+            element={
+              <ProtectedRoute>
+                <NodeDiskUsagePercent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_memory_usage_percent"
+            element={
+              <ProtectedRoute>
+                <NodeMemoryUsagePercent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/metrics/node_process_count"
+            element={
+              <ProtectedRoute>
+                <NodeProcessCount />
               </ProtectedRoute>
             }
           />

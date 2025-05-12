@@ -703,6 +703,115 @@ setInterval(
   5000
 );
 
+// New endpoint for network receive bytes
+app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_NETWORK_RECEIVE_BYTES' },
+      defaults: { name: 'NODE_NETWORK_RECEIVE_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_network_receive_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for disk space usage percentage
+app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_DISK_USAGE_PERCENT' },
+      defaults: { name: 'NODE_DISK_USAGE_PERCENT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=100 - ((node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"})');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_disk_usage_percent: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for memory usage percentage
+app.get('/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_MEMORY_USAGE_PERCENT' },
+      defaults: { name: 'NODE_MEMORY_USAGE_PERCENT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_memory_usage_percent: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// New endpoint for process count
+app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_PROCESS_COUNT' },
+      defaults: { name: 'NODE_PROCESS_COUNT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=node_procs_running');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_process_count: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Add new interval fetches for the new metrics
+setInterval(
+  () => fetchAndEmit("NODE_NETWORK_RECEIVE_BYTES", "rate(node_network_receive_bytes_total[1m])"),
+  5000
+);
+
+setInterval(
+  () => fetchAndEmit("NODE_DISK_USAGE_PERCENT", "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/\"})"),
+  5000
+);
+
+setInterval(
+  () => fetchAndEmit("NODE_MEMORY_USAGE_PERCENT", "100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)"),
+  5000
+);
+
+setInterval(
+  () => fetchAndEmit("NODE_PROCESS_COUNT", "node_procs_running"),
+  5000
+);
+
 // HTTP-эндпоинт для истории без realtime (для initial load)
 app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   try {
