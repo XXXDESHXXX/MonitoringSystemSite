@@ -728,22 +728,53 @@ app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, 
 // New endpoint for disk space usage percentage
 app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
   try {
+    console.log('Starting disk usage percent request...');
+    
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_DISK_USAGE_PERCENT' },
       defaults: { name: 'NODE_DISK_USAGE_PERCENT' }
     });
+    console.log('Metric found/created:', metric.name);
+
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://127.0.0.1:9090/api/v1/query?query=100 - ((node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"})');
+    console.log('Trackable found:', !!track);
+
+    // Сначала получим список всех метрик файловой системы
+    const listUrl = 'http://127.0.0.1:9090/api/v1/query?query=node_filesystem_size_bytes';
+    console.log('Listing filesystem metrics:', listUrl);
+    
+    const listResponse = await fetch(listUrl);
+    const listData = await listResponse.json();
+    console.log('Available filesystem metrics:', JSON.stringify(listData, null, 2));
+
+    // Теперь используем правильный mountpoint
+    const prometheusUrl = 'http://127.0.0.1:9090/api/v1/query?query=(node_filesystem_size_bytes{mountpoint=~".*"} - node_filesystem_free_bytes{mountpoint=~".*"}) * 100 / node_filesystem_size_bytes{mountpoint=~".*"}';
+    console.log('Prometheus URL:', prometheusUrl);
+
+    const response = await fetch(prometheusUrl);
+    console.log('Prometheus response status:', response.status);
+    
     const data = await response.json();
+    console.log('Prometheus data:', JSON.stringify(data, null, 2));
+
     if (data.status === 'success' && data.data.result.length > 0) {
+      // Берем первое значение из результатов
       const val = parseFloat(data.data.result[0].value[1]);
-      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      console.log('Parsed value:', val);
+
+      if (track) {
+        await MetricValue.create({ value: val, metric_id: metric.id });
+        console.log('Metric value created');
+      }
+
       return res.json({ node_disk_usage_percent: val });
     }
+
+    console.log('No data returned from Prometheus');
     res.status(500).json({ error: 'No data returned from Prometheus' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch data' });
+    console.error('Error in disk usage percent endpoint:', error);
+    res.status(500).json({ error: 'Failed to fetch data', details: error.message });
   }
 });
 
@@ -798,7 +829,7 @@ setInterval(
 );
 
 setInterval(
-  () => fetchAndEmit("NODE_DISK_USAGE_PERCENT", "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/\"})"),
+  () => fetchAndEmit("NODE_DISK_USAGE_PERCENT", "(node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_free_bytes{mountpoint=\"/\"}) * 100 / node_filesystem_size_bytes{mountpoint=\"/\"}"),
   5000
 );
 
