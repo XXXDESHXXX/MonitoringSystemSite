@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { getAbsoluteURL }    from '../utils/utils';
-import { API_ENDPOINTS }     from '../constants';
-import RequestIndicator      from './RequestIndicator';
-import StarToggle            from './StarToggle';
-import useMetricTracking     from '../hooks/useMetricTracking';
-import CommentsPanel         from './CommentsPanel';
-import ValueHistoryPanel     from './ValueHistoryPanel';
+import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
+import RequestIndicator from './RequestIndicator';
+import StarToggle from './StarToggle';
+import useMetricTracking from '../hooks/useMetricTracking';
+import CommentsPanel from './CommentsPanel';
+import ValueHistoryPanel from './ValueHistoryPanel';
 import '../index.css';
 
 export default function NodeMemoryTotalBytes() {
-  const [value, setValue]     = useState(null);
-  const [status, setStatus]   = useState(null);
+  const [totalMemory, setTotalMemory] = useState(null);
+  const [status, setStatus] = useState(null);
 
   const {
     metricId,
@@ -24,18 +24,35 @@ export default function NodeMemoryTotalBytes() {
     let cancelled = false;
 
     async function fetchData() {
-      setStatus(null);
-      const res = await fetch(
-        getAbsoluteURL(API_ENDPOINTS.memTotalBytes),
-        { credentials: 'include' }
-      );
-      if (cancelled) return;
-      setStatus(res.status);
-      if (!res.ok) return;
-      const json = await res.json();
-      if (typeof json.node_memory_MemTotal_bytes === 'number') {
-        // Convert bytes to GB for better readability
-        setValue((json.node_memory_MemTotal_bytes / (1024 * 1024 * 1024)).toFixed(2));
+      try {
+        setStatus(null);
+        console.log('Fetching memory data...');
+        
+        const url = getAbsoluteURL(API_ENDPOINTS.memTotalBytes);
+        console.log('Request URL:', url);
+        
+        const response = await fetch(url, { credentials: 'include' });
+        if (cancelled) return;
+        
+        if (!response.ok) {
+          console.error('Failed to fetch memory data:', response.status);
+          setStatus(response.status);
+          return;
+        }
+        
+        const data = await response.json();
+        console.log('Received memory data:', data);
+        
+        if (typeof data.node_memory_MemTotal_bytes === 'number') {
+          setTotalMemory(data.node_memory_MemTotal_bytes);
+          setStatus(200);
+        } else {
+          console.error('Invalid memory data format:', data);
+          setStatus(500);
+        }
+      } catch (err) {
+        console.error('Error fetching memory data:', err);
+        setStatus(500);
       }
     }
 
@@ -47,22 +64,80 @@ export default function NodeMemoryTotalBytes() {
     };
   }, [initialized]);
 
-  if (!initialized) return null;
+  if (!initialized) {
+    console.log('Component not initialized yet');
+    return null;
+  }
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const containerStyle = {
+    width: '100%',
+    maxWidth: '600px',
+    margin: '20px auto',
+    padding: '20px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '15px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+  };
+
+  const memoryDisplayStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '30px',
+    backgroundColor: '#fff',
+    borderRadius: '10px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+  };
+
+  const valueStyle = {
+    fontSize: '48px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    margin: '20px 0',
+    textAlign: 'center'
+  };
+
+  const labelStyle = {
+    fontSize: '18px',
+    color: '#666',
+    marginBottom: '10px'
+  };
+
+  const iconStyle = {
+    fontSize: '64px',
+    color: '#3498db',
+    marginBottom: '20px'
+  };
 
   return (
     <div className="metric-container">
       <div className="metric-header">
         <StarToggle isOn={isTracked} onToggle={toggleTracking} />
-        <h1 className="title">Метрика: Total System Memory</h1>
+        <h1 className="title">Memory Total Bytes</h1>
       </div>
       <p className="description">
         Общий объем оперативной памяти в системе.
       </p>
       <div className="metric-status">
         <RequestIndicator statusCode={status} />
-        <span className="metric-value">
-          Значение: {value != null ? `${value} GB` : '—'}
-        </span>
+      </div>
+
+      <div style={containerStyle}>
+        <div style={memoryDisplayStyle}>
+          <div style={iconStyle}>💾</div>
+          <div style={labelStyle}>Общий объем памяти</div>
+          <div style={valueStyle}>
+            {totalMemory != null ? formatBytes(totalMemory) : '—'}
+          </div>
+        </div>
       </div>
 
       <CommentsPanel metricId={metricId} />
