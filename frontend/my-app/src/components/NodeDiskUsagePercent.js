@@ -86,36 +86,86 @@ export default function NodeDiskUsagePercent() {
       {
         data: [diskUsage || 0, 100 - (diskUsage || 0)],
         backgroundColor: [
-          'rgba(255, 99, 132, 0.8)',
-          'rgba(75, 192, 192, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
+          'rgba(54, 162, 235, 0.8)',
         ],
         borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(75, 192, 192, 1)',
+          'rgba(255, 159, 64, 1)',
+          'rgba(54, 162, 235, 1)',
         ],
-        borderWidth: 1,
+        borderWidth: 2,
+        hoverOffset: 4,
+        hoverBorderWidth: 3,
+        hoverBorderColor: 'rgba(255, 255, 255, 0.8)',
+        hoverBackgroundColor: [
+          'rgba(255, 159, 64, 0.9)',
+          'rgba(54, 162, 235, 0.9)',
+        ],
       },
     ],
   };
 
   const pieOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'bottom',
+        labels: {
+          padding: 20,
+          font: {
+            size: 14,
+            weight: 'bold'
+          },
+          color: '#666'
+        }
       },
       title: {
         display: true,
-        text: 'Распределение использования диска'
+        text: 'Распределение использования диска',
+        font: {
+          size: 18,
+          weight: 'bold'
+        },
+        padding: {
+          top: 20,
+          bottom: 20
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: {
+          size: 16,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 14
+        },
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        callbacks: {
+          label: function(context) {
+            return `${context.label}: ${context.raw.toFixed(2)}%`;
+          }
+        }
       }
-    }
+    },
+    animation: {
+      animateScale: true,
+      animateRotate: true,
+      duration: 1000,
+      easing: 'easeOutQuart'
+    },
+    cutout: '30%',
+    radius: '90%'
   };
 
   return (
     <div className="metric-container">
       <div className="metric-header">
         <StarToggle isOn={isTracked} onToggle={toggleTracking} />
-        <h1 className="title">Метрика: Disk Usage Percent</h1>
+        <h1 className="title">Disk Usage Percent</h1>
       </div>
       <p className="description">
         Процент использования дискового пространства.
@@ -127,7 +177,12 @@ export default function NodeDiskUsagePercent() {
         </span>
       </div>
 
-      <div className="chart-container" style={{ maxWidth: '300px', margin: '20px auto' }}>
+      <div className="chart-container" style={{ 
+        maxWidth: '400px', 
+        margin: '20px auto',
+        height: '400px',
+        position: 'relative'
+      }}>
         <Pie data={pieData} options={pieOptions} />
       </div>
 

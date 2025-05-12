@@ -39,7 +39,7 @@ export default function LoadAverage() {
       const json = await res.json();
       console.log('Received data:', json);
       if (typeof json.load_average === 'number') {
-        setLoad((json.load_average * 100).toFixed(2));
+        setLoad(json.load_average * 100);
       }
     }
     fetchData();
@@ -55,6 +55,35 @@ export default function LoadAverage() {
     return null;
   }
 
+  const getColorForLoad = (loadValue) => {
+    if (loadValue < 50) return '#4BC0C0'; // Зеленый для низкой нагрузки
+    if (loadValue < 80) return '#FF9F40'; // Оранжевый для средней нагрузки
+    return '#FF6384'; // Красный для высокой нагрузки
+  };
+
+  const progressBarStyle = {
+    width: '100%',
+    height: '30px',
+    backgroundColor: '#f0f0f0',
+    borderRadius: '15px',
+    overflow: 'hidden',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+    margin: '20px 0'
+  };
+
+  const progressFillStyle = {
+    width: `${Math.min(load || 0, 100)}%`,
+    height: '100%',
+    backgroundColor: getColorForLoad(load || 0),
+    transition: 'width 0.5s ease-in-out, background-color 0.5s ease-in-out',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: 'bold',
+    textShadow: '1px 1px 1px rgba(0,0,0,0.3)'
+  };
+
   return (
     <div className="metric-container">
       <div className="metric-header">
@@ -67,8 +96,14 @@ export default function LoadAverage() {
       <div className="metric-status">
         <RequestIndicator statusCode={status} />
         <span className="metric-value">
-          Значение: {load != null ? `${load} %` : '—'}
+          Значение: {load != null ? `${load.toFixed(2)} %` : '—'}
         </span>
+      </div>
+
+      <div style={progressBarStyle}>
+        <div style={progressFillStyle}>
+          {load != null ? `${load.toFixed(2)}%` : '—'}
+        </div>
       </div>
 
       {/* Перенесли внутрь .metric-container */}
