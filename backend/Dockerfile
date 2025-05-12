@@ -1,29 +1,26 @@
-FROM node:22.14.0-alpine as builder
+FROM node:18-alpine
 
 WORKDIR /app
 
+# Установка зависимостей
 COPY package*.json ./
 RUN npm install
+
+# Копирование исходного кода
 COPY . .
 
-# Компиляция проекта в папку dist
-RUN npm run build
+# Установка PM2 глобально
+RUN npm install -g pm2
 
-FROM node:22.14.0-alpine as production
+# Создание непривилегированного пользователя
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN chown -R appuser:appgroup /app
 
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install --production && \
-    npm install -g pm2
-
-COPY --from=builder /app/dist ./dist
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && chown -R appuser:appgroup /app
-
-EXPOSE 5000
-
+# Переключение на непривилегированного пользователя
 USER appuser
 
-CMD ["pm2-runtime", "start", "dist/main.js"]
+# Открытие порта
+EXPOSE 5000
+
+# Запуск приложения через PM2
+CMD ["pm2-runtime", "start", "app.js"]

@@ -1,53 +1,87 @@
 version: '3.8'
 
 services:
-  frontend:
-    build:
-      context: ./frontend/my-app
-      dockerfile: frontend/my-app/Dockerfile
-    container_name: myapp-frontend
-    restart: always
-    ports:
-      - "8081:80"
-    networks:
-      - myapp-network
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: myapp-backend
+    container_name: course-project-backend
     restart: always
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DB_URL}
-    env_file:
-      - backend/.env
+      - SECRET_KEY=123
+      - SESSION_SECRET=dsadasdagdsgafas
+      - DB_NAME=course_project
+      - DB_USER=postgres
+      - DB_PASSWORD=112233
+      - DB_HOST=db
+      - DB_DIALECT=postgres
+      - DB_LOGGING=false
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=kirya.shvarts@gmail.com
+      - SMTP_PASS=hmcv wkpb ghbu uuwn
+      - FROM_EMAIL=kirya.shvarts@gmail.com
+      - PORT=5000
     ports:
       - "5000:5000"
     depends_on:
       - db
     networks:
-      - myapp-network
+      - app-network
 
   db:
-    image: postgres:15
-    container_name: myapp-db
+    image: postgres:16-alpine
+    container_name: course-project-db
+    environment:
+      - POSTGRES_DB=course_project
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=112233
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - myapp-network
+      - app-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: course-project-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - app-network
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: course-project-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - app-network
 
 networks:
-  myapp-network:
+  app-network:
+    driver: bridge
 
 volumes:
-  db_data:
+  postgres_data:
+  prometheus_data:
 
 
