@@ -18,6 +18,7 @@ services:
       - DB_DIALECT=postgres
       - DB_LOGGING=false
       - SMTP_HOST=smtp.gmail.com
+      - FRONTEND_URL=http://193.37.71.41
       - SMTP_PORT=587
       - SMTP_USER=kirya.shvarts@gmail.com
       - SMTP_PASS=hmcv wkpb ghbu uuwn

@@ -22,24 +22,33 @@ export default function ValueHistoryPanel({ metricId }) {
 
   // 1) Подключаемся к бекенд‑WebSocket один раз
   useEffect(() => {
-    socketRef.current = io({
+    const socketUrl = window.location.protocol === 'https:' 
+      ? `wss://${window.location.host}`
+      : `ws://${window.location.host}`;
+
+    socketRef.current = io(socketUrl, {
       path: '/socket.io',
       transports: ['websocket'],
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      autoConnect: true
     });
 
     socketRef.current.on('connect', () => {
-      console.log('Socket.IO connected');
+      console.log('Socket.IO connected to:', socketUrl);
     });
 
     socketRef.current.on('connect_error', (error) => {
       console.error('Socket.IO connection error:', error);
     });
 
-    return () => socketRef.current.disconnect();
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
   }, []);
 
   // 2) При открытии панели: initial load + подписка

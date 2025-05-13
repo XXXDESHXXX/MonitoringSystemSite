@@ -115,8 +115,10 @@ const io = new SocketIO(httpServer, {
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  exposedHeaders: ["Set-Cookie"],
+  maxAge: 86400
 }));
 app.use(express.json());
 
@@ -129,7 +131,8 @@ app.use(session({
     sameSite: 'lax',
     secure: false,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 часа
+    maxAge: 24 * 60 * 60 * 1000, // 24 часа
+    domain: process.env.NODE_ENV === 'production' ? '.193.37.71.41' : undefined
   }
 }));
 
