@@ -95,11 +95,28 @@ import { Op } from 'sequelize';
 const app = express();
 const httpServer = createServer(app);
 const io = new SocketIO(httpServer, {
-  cors: { origin: "http://localhost:3000", credentials: true }
+  cors: { 
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  path: '/socket.io',
+  transports: ['websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  cookie: {
+    name: 'io',
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax'
+  }
 });
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
 
@@ -124,32 +141,55 @@ initializePassport();
 app.use("/auth", authRouter);
 app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 // Socket.IO — подписка на комнаты по метрике
-io.on("connection", socket => {
-  socket.on("subscribe", ({ metricId }) => {
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+
+  socket.on('subscribe', ({ metricId }) => {
+    console.log(`Client ${socket.id} subscribed to metric ${metricId}`);
     socket.join(`metric-${metricId}`);
   });
-  socket.on("unsubscribe", ({ metricId }) => {
+
+  socket.on('unsubscribe', ({ metricId }) => {
+    console.log(`Client ${socket.id} unsubscribed from metric ${metricId}`);
     socket.leave(`metric-${metricId}`);
   });
 });
 
 // При создании новых значений — эмитим событие
 async function fetchAndEmit(metricName, promQuery, jsonKey) {
-  const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
-  const track = await Trackable.findOne({
-    where: { user_id: null, metric_id: metric.id } // отслеживаем для всех, но можно усложнить
-  });
-  const response = await fetch(`http://prometheus:9090/api/v1/query?query=${promQuery}`);
-  const data = await response.json();
-  if (data.status === "success" && data.data.result.length) {
-    const val = parseFloat(data.data.result[0].value[1]);
-    await MetricValue.create({ value: val, metric_id: metric.id });
-    // шлём всем в комнате этого metricId
-    io.to(`metric-${metric.id}`).emit("newValue", {
-      metricId: metric.id,
-      value: val,
-      date: new Date().toISOString()
+  try {
+    const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
+    const track = await Trackable.findOne({
+      where: { user_id: null, metric_id: metric.id }
     });
+
+    const response = await fetch(`http://prometheus:9090/api/v1/query?query=${promQuery}`);
+    const data = await response.json();
+
+    if (data.status === "success" && data.data.result.length) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      
+      if (track) {
+        await MetricValue.create({ value: val, metric_id: metric.id });
+      }
+
+      // Эмитим событие всем клиентам в комнате
+      io.to(`metric-${metric.id}`).emit("newValue", {
+        metricId: metric.id,
+        value: val,
+        date: new Date().toISOString()
+      });
+
+      console.log(`Emitted new value for ${metricName}:`, val);
+    } else {
+      console.warn(`No data returned from Prometheus for ${metricName}`);
+    }
+  } catch (error) {
+    console.error(`Error in fetchAndEmit for ${metricName}:`, error);
   }
 }
 

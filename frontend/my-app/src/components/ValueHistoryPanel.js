@@ -25,8 +25,20 @@ export default function ValueHistoryPanel({ metricId }) {
     socketRef.current = io({
       path: '/socket.io',
       transports: ['websocket'],
-      withCredentials: true
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
+
+    socketRef.current.on('connect', () => {
+      console.log('Socket.IO connected');
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+    });
+
     return () => socketRef.current.disconnect();
   }, []);
 
