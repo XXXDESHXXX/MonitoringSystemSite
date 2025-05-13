@@ -882,7 +882,7 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
 
 app.get('/metrics/node_network_transmit_bytes', ensureAuthenticated, async (req, res) => {
   try {
-    const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=rate(node_network_transmit_bytes_total[1m])`);
+    const response = await fetch(`http://prometheus:9090/api/v1/query?query=rate(node_network_transmit_bytes_total[1m])`);
     const data = await response.json();
     res.json(data);
   } catch (error) {
