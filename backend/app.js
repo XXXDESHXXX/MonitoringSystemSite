@@ -139,7 +139,7 @@ async function fetchAndEmit(metricName, promQuery, jsonKey) {
   const track = await Trackable.findOne({
     where: { user_id: null, metric_id: metric.id } // отслеживаем для всех, но можно усложнить
   });
-  const response = await fetch(`http://course-project-prometheus:9090/api/v1/query?query=${promQuery}`);
+  const response = await fetch(`http://prometheus:9090/api/v1/query?query=${promQuery}`);
   const data = await response.json();
   if (data.status === "success" && data.data.result.length) {
     const val = parseFloat(data.data.result[0].value[1]);
@@ -236,7 +236,7 @@ app.get('/metrics/load_average', ensureAuthenticated, async (req, res) => {
       defaults: { name: 'LOAD_AVERAGE' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_load1');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_load1');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -258,7 +258,7 @@ app.get('/metrics/node_cpu_seconds_total', ensureAuthenticated, async (req, res)
       defaults: { name: 'NODE_CPU_SECONDS_TOTAL' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_cpu_seconds_total');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_cpu_seconds_total');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -279,7 +279,7 @@ app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, r
       defaults: { name: 'NODE_MEMORY_MEMFREE_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_memory_MemFree_bytes');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_memory_MemFree_bytes');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -301,7 +301,7 @@ app.get('/metrics/node_memory_total_bytes', ensureAuthenticated, async (req, res
       defaults: { name: 'NODE_MEMORY_TOTAL_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_memory_MemTotal_bytes');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_memory_MemTotal_bytes');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -323,7 +323,7 @@ app.get('/metrics/node_cpu_usage_percent', ensureAuthenticated, async (req, res)
       defaults: { name: 'NODE_CPU_USAGE_PERCENT' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -345,7 +345,7 @@ app.get('/metrics/node_disk_read_bytes', ensureAuthenticated, async (req, res) =
       defaults: { name: 'NODE_DISK_READ_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_disk_read_bytes_total');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_disk_read_bytes_total');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -367,7 +367,7 @@ app.get('/metrics/node_disk_write_bytes', ensureAuthenticated, async (req, res) 
       defaults: { name: 'NODE_DISK_WRITE_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_disk_written_bytes_total');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_disk_written_bytes_total');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -389,7 +389,7 @@ app.get('/metrics/node_memory_cached_bytes', ensureAuthenticated, async (req, re
       defaults: { name: 'NODE_MEMORY_CACHED_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_memory_Cached_bytes');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_memory_Cached_bytes');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -411,7 +411,7 @@ app.get('/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
       defaults: { name: 'NODE_DISK_IO_TIME' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_disk_io_time_seconds_total');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_disk_io_time_seconds_total');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -433,7 +433,7 @@ app.get('/metrics/node_uptime', ensureAuthenticated, async (req, res) => {
       defaults: { name: 'NODE_UPTIME' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_time_seconds - node_boot_time_seconds');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_time_seconds - node_boot_time_seconds');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -711,7 +711,7 @@ app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, 
       defaults: { name: 'NODE_NETWORK_RECEIVE_BYTES' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -740,7 +740,7 @@ app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res
     console.log('Trackable found:', !!track);
 
     // Сначала получим список всех метрик файловой системы
-    const listUrl = 'http://course-project-prometheus:9090/api/v1/query?query=node_filesystem_size_bytes';
+    const listUrl = 'http://prometheus:9090/api/v1/query?query=node_filesystem_size_bytes';
     console.log('Listing filesystem metrics:', listUrl);
     
     const listResponse = await fetch(listUrl);
@@ -748,7 +748,7 @@ app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res
     console.log('Available filesystem metrics:', JSON.stringify(listData, null, 2));
 
     // Теперь используем правильный mountpoint
-    const prometheusUrl = 'http://course-project-prometheus:9090/api/v1/query?query=(node_filesystem_size_bytes{mountpoint=~".*"} - node_filesystem_free_bytes{mountpoint=~".*"}) * 100 / node_filesystem_size_bytes{mountpoint=~".*"}';
+    const prometheusUrl = 'http://prometheus:9090/api/v1/query?query=(node_filesystem_size_bytes{mountpoint=~".*"} - node_filesystem_free_bytes{mountpoint=~".*"}) * 100 / node_filesystem_size_bytes{mountpoint=~".*"}';
     console.log('Prometheus URL:', prometheusUrl);
 
     const response = await fetch(prometheusUrl);
@@ -786,7 +786,7 @@ app.get('/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, r
       defaults: { name: 'NODE_MEMORY_USAGE_PERCENT' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
@@ -808,7 +808,7 @@ app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => 
       defaults: { name: 'NODE_PROCESS_COUNT' }
     });
     const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://course-project-prometheus:9090/api/v1/query?query=node_procs_running');
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_procs_running');
     const data = await response.json();
     if (data.status === 'success' && data.data.result.length > 0) {
       const val = parseFloat(data.data.result[0].value[1]);
