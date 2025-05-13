@@ -22,7 +22,8 @@ export default function ValueHistoryPanel({ metricId }) {
 
   // 1) Подключаемся к бекенд‑WebSocket один раз
   useEffect(() => {
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io({
+      path: '/socket.io',
       transports: ['websocket'],
       withCredentials: true
     });
