@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate }      from 'react-router-dom';
 import { getAbsoluteURL }   from '../utils/utils';
 import { API_ENDPOINTS }    from '../constants';
-import StarToggle           from './StarToggle';
 import './MetricsList.css';
 
 const METRICS_PER_PAGE = 9;
@@ -12,28 +11,25 @@ const METRICS_PER_PAGE = 9;
 export default function MetricsList() {
   const [metrics, setMetrics]               = useState([]);
   const [allTags, setAllTags]               = useState([]);
-  const [trackedIds, setTrackedIds]         = useState(new Set());
   const [selectedTagIds, setSelectedTagIds] = useState(new Set());
   const [searchQuery, setSearchQuery]       = useState('');
   const [currentPage, setCurrentPage]       = useState(1);
+  const [trackedMetrics, setTrackedMetrics] = useState(new Set());
   const navigate = useNavigate();
 
-  // 1) Загрузка всех тегов и трекнутых метрик
+  // 1) Загрузка всех тегов и отслеживаемых метрик
   useEffect(() => {
     async function loadInitial() {
       try {
-        const [trackedRes, tagsRes] = await Promise.all([
-          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' }),
-          fetch(getAbsoluteURL(API_ENDPOINTS.tags),           { credentials: 'include' }),
-        ]);
-        const [tracked, tags] = await Promise.all([
-          trackedRes.json(),
-          tagsRes.json(),
-        ]);
+        // Загружаем теги
+        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.tags), { credentials: 'include' });
+        const tags = await tagsRes.json();
         setAllTags(Array.isArray(tags) ? tags : []);
-        const ids = (Array.isArray(tracked) ? tracked : [])
-          .map(x => (typeof x === 'object' ? x.id : x));
-        setTrackedIds(new Set(ids));
+
+        // Загружаем отслеживаемые метрики
+        const trackedRes = await fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' });
+        const tracked = await trackedRes.json();
+        setTrackedMetrics(new Set(tracked.map(m => m.id)));
       } catch (err) {
         console.error('Error loading initial data:', err);
       }
@@ -61,33 +57,36 @@ export default function MetricsList() {
       });
   }, [searchQuery, selectedTagIds]);
 
-  // 3) Тоггл трекинга
-  const toggleTrack = async (metricId) => {
-    const isOn = trackedIds.has(metricId);
-    const method = isOn ? 'DELETE' : 'POST';
-    try {
-      const res = await fetch(
-        getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)),
-        { method, credentials: 'include' }
-      );
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      setTrackedIds(prev => {
-        const copy = new Set(prev);
-        isOn ? copy.delete(metricId) : copy.add(metricId);
-        return copy;
-      });
-    } catch (err) {
-      console.error('Error toggling track:', err);
-    }
-  };
+  // Функция для переключения отслеживания метрики
+  const toggleTracking = async (metricId, e) => {
+    e.stopPropagation(); // Предотвращаем переход на страницу метрики
 
-  // 4) Выбор/снятие фильтра по тегу
-  const toggleFilterTag = (tagId) => {
-    setSelectedTagIds(prev => {
-      const copy = new Set(prev);
-      copy.has(tagId) ? copy.delete(tagId) : copy.add(tagId);
-      return copy;
-    });
+    try {
+      const isTracked = trackedMetrics.has(metricId);
+      const method = isTracked ? 'DELETE' : 'POST';
+      
+      const response = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)), 
+        { 
+          method,
+          credentials: 'include'
+        }
+      );
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      setTrackedMetrics(prev => {
+        const next = new Set(prev);
+        if (isTracked) {
+          next.delete(metricId);
+        } else {
+          next.add(metricId);
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error('Error toggling metric tracking:', error);
+    }
   };
 
   // Фильтрация метрик по тегам
@@ -115,7 +114,11 @@ export default function MetricsList() {
             <li
               key={t.id}
               className={`tag-item${selectedTagIds.has(t.id) ? ' selected' : ''}`}
-              onClick={() => toggleFilterTag(t.id)}
+              onClick={() => setSelectedTagIds(prev => {
+                const copy = new Set(prev);
+                copy.has(t.id) ? copy.delete(t.id) : copy.add(t.id);
+                return copy;
+              })}
             >
               {t.name}
             </li>
@@ -138,15 +141,20 @@ export default function MetricsList() {
         <ul className="metrics-list">
           {paginatedMetrics.map(m => (
             <li key={m.id} className="metrics-item">
-              <StarToggle
-                isOn={trackedIds.has(m.id)}
-                onToggle={() => toggleTrack(m.id)}
-              />
-              <div
-                className="metrics-link"
-                onClick={() => navigate(`/metrics/${m.name.toLowerCase()}`)}
-              >
-                {m.name.replace(/_/g, ' ')}
+              <div className="metrics-item-header">
+                <div
+                  className="metrics-link"
+                  onClick={() => navigate(`/metrics/${m.name.toLowerCase()}`)}
+                >
+                  {m.name.replace(/_/g, ' ')}
+                </div>
+                <button 
+                  className={`favorite-button ${trackedMetrics.has(m.id) ? 'active' : ''}`}
+                  onClick={(e) => toggleTracking(m.id, e)}
+                  title={trackedMetrics.has(m.id) ? "Удалить из избранного" : "Добавить в избранное"}
+                >
+                  ★
+                </button>
               </div>
               <div className="metrics-tags">
                 {m.tags.map(tag => (
@@ -192,6 +200,7 @@ export default function MetricsList() {
     </div>
   );
 }
+
 // Helper function to determine text color based on background color
 function getContrastColor(hexColor) {
   // Remove the hash if it exists

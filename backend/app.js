@@ -200,7 +200,7 @@ const app = express();
 const httpServer = createServer(app);
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://monitoringsite.online',
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
@@ -219,7 +219,7 @@ app.use(session({
     secure: false,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 часа
-    domain: process.env.NODE_ENV === 'production' ? '.193.37.71.41' : undefined
+    domain: process.env.NODE_ENV === 'production' ? '.monitoringsite.online' : undefined
   }
 }));
 
@@ -313,6 +313,10 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
       Metric.findOrCreate({ where: { name: 'NODE_MEMORY_CACHED_BYTES' } }),
       Metric.findOrCreate({ where: { name: 'NODE_DISK_IO_TIME' } }),
       Metric.findOrCreate({ where: { name: 'NODE_UPTIME' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_PROCESS_COUNT' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_DISK_USAGE_PERCENT' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_NETWORK_RECEIVE_BYTES' } }),
+      Metric.findOrCreate({ where: { name: 'NODE_MEMORY_USAGE_PERCENT' } })
     ]);
 
     // 2) Считаем параметры из query
@@ -865,6 +869,94 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('Error fetching metric values:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Endpoint for process count
+app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_PROCESS_COUNT' },
+      defaults: { name: 'NODE_PROCESS_COUNT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_procs_running');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_process_count: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Endpoint for disk usage percent
+app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_DISK_USAGE_PERCENT' },
+      defaults: { name: 'NODE_DISK_USAGE_PERCENT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) * 100 / node_filesystem_size_bytes{mountpoint="/"}');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_disk_usage_percent: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Endpoint for network receive bytes
+app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_NETWORK_RECEIVE_BYTES' },
+      defaults: { name: 'NODE_NETWORK_RECEIVE_BYTES' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_network_receive_bytes: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
+
+// Endpoint for memory usage percent
+app.get('/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, res) => {
+  try {
+    const [metric] = await Metric.findOrCreate({
+      where: { name: 'NODE_MEMORY_USAGE_PERCENT' },
+      defaults: { name: 'NODE_MEMORY_USAGE_PERCENT' }
+    });
+    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
+    const response = await fetch('http://prometheus:9090/api/v1/query?query=100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)');
+    const data = await response.json();
+    if (data.status === 'success' && data.data.result.length > 0) {
+      const val = parseFloat(data.data.result[0].value[1]);
+      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
+      return res.json({ node_memory_usage_percent: val });
+    }
+    res.status(500).json({ error: 'No data returned from Prometheus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 

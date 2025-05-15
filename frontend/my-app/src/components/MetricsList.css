@@ -122,11 +122,19 @@
   flex-direction: column;
   gap: 12px;
   border: 1px solid #e2e8f0;
+  position: relative;
 }
 
 .metrics-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.metrics-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 .metrics-link {
@@ -135,10 +143,32 @@
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s ease;
+  flex: 1;
 }
 
 .metrics-link:hover {
   color: #4299e1;
+}
+
+.favorite-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #cbd5e0;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.favorite-button:hover {
+  color: #ecc94b;
+  transform: scale(1.1);
+}
+
+.favorite-button.active {
+  color: #ecc94b;
 }
 
 .metrics-tags {
@@ -164,19 +194,6 @@
   color: #718096;
   font-size: 1.1rem;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-}
-
-/* Star toggle styles */
-.star-toggle {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.star-toggle:hover {
-  transform: scale(1.1);
 }
 
 /* Стили для пагинации */
