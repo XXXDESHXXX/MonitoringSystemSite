@@ -15,35 +15,14 @@ export const AuthProvider = ({ children }) => {
     return !!localStorage.getItem('user');
   });
 
-  // При старте приложения получаем данные о пользователе
+  // При старте приложения проверяем сохраненную сессию
   useEffect(() => {
-    fetch(getAbsoluteURL(API_ENDPOINTS.me), {
-      credentials: 'include'
-    })
-      .then(async res => {
-        if (res.ok) {
-          const data = await res.json();
-          const userData = {
-            id: data.id,
-            username: data.username,
-            role: data.role,
-            email: data.email
-          };
-          setUser(userData);
-          setIsAuthenticated(true);
-          localStorage.setItem('user', JSON.stringify(userData));
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
-          localStorage.removeItem('user');
-        }
-      })
-      .catch(() => {
-        setUser(null);
-        setIsAuthenticated(false);
-        localStorage.removeItem('user');
-      })
-      .finally(() => setChecking(false));
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      setIsAuthenticated(true);
+    }
+    setChecking(false);
   }, []);
 
   const login = async (username, password) => {
@@ -54,34 +33,26 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Login failed');
     }
 
-    const userData = {
-      id: data.id,
-      username: data.username,
-      role: data.role,
-      email: data.email
-    };
-    setUser(userData);
+    // Сохраняем пользователя в localStorage
+    localStorage.setItem('user', JSON.stringify(data));
+    setUser(data);
     setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const logout = () => {
-    fetch(getAbsoluteURL(API_ENDPOINTS.logout), {
-      method: 'POST',
-      credentials: 'include'
-    }).finally(() => {
-      setUser(null);
-      setIsAuthenticated(false);
-      localStorage.removeItem('user');
-    });
+    localStorage.removeItem('user');
+    setUser(null);
+    setIsAuthenticated(false);
   };
 
-  if (checking) return null;
+  if (checking) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUser }}>

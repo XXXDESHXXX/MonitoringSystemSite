@@ -114,26 +114,20 @@ const io = new SocketIO(httpServer, {
   }
 });
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-  exposedHeaders: ["Set-Cookie"],
-  maxAge: 86400
+  origin: true, // Разрешаем все источники
+  credentials: true
 }));
 app.use(express.json());
 
-// Сессии с куки для кросс-доменных запросов
+// Упрощенные настройки сессии
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: 'your-secret-key',
   resave: true,
   saveUninitialized: true,
   cookie: {
-    sameSite: 'lax',
     secure: false,
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 часа
-    domain: process.env.NODE_ENV === 'production' ? '.193.37.71.41' : undefined
+    httpOnly: false, // Разрешаем доступ к куки из JavaScript
+    maxAge: 24 * 60 * 60 * 1000 // 24 часа
   }
 }));
 
@@ -142,6 +136,16 @@ import { initializePassport, passport } from "./dependencies.js";
 app.use(passport.initialize());
 app.use(passport.session());
 initializePassport();
+
+// Добавляем middleware для установки заголовков
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || 'http://localhost:3000');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  next();
+});
+
 app.use("/auth", authRouter);
 app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 // Socket.IO — подписка на комнаты по метрике
