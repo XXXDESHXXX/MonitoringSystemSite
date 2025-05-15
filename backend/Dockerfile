@@ -17,10 +17,9 @@ RUN npm install
 COPY . .
 
 # Устанавливаем PM2 для продакшен‑запуска
-RUN npm install -g pm2 \
-      ttf-dejavu \
-      fontconfig
+RUN npm install -g pm2
 
+# Создаём непривилегированного пользователя и меняем владельца
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     chown -R appuser:appgroup /app
 
