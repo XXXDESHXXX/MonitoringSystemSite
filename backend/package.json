@@ -11,6 +11,7 @@
     "op": "^0.0.6",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pdfkit": "^0.14.0",
     "pg": "^8.14.1",
     "pg-hstore": "^2.3.4",
     "postgres": "^3.4.5",
