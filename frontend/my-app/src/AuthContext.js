@@ -7,8 +7,13 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [checking, setChecking] = useState(true);
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('user');
+  });
 
   // При старте приложения получаем данные о пользователе
   useEffect(() => {
@@ -18,22 +23,25 @@ export const AuthProvider = ({ children }) => {
       .then(async res => {
         if (res.ok) {
           const data = await res.json();
-          // Ожидаем { id, username, role, email }
-          setUser({
+          const userData = {
             id: data.id,
             username: data.username,
             role: data.role,
             email: data.email
-          });
+          };
+          setUser(userData);
           setIsAuthenticated(true);
+          localStorage.setItem('user', JSON.stringify(userData));
         } else {
           setUser(null);
           setIsAuthenticated(false);
+          localStorage.removeItem('user');
         }
       })
       .catch(() => {
         setUser(null);
         setIsAuthenticated(false);
+        localStorage.removeItem('user');
       })
       .finally(() => setChecking(false));
   }, []);
@@ -46,20 +54,20 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ username, password })
     });
 
-    // пытаемся прочитать JSON с ошибкой или данными
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || 'Login failed');
     }
 
-    // Успешно: сохраняем пользователя
-    setUser({
+    const userData = {
       id: data.id,
       username: data.username,
       role: data.role,
       email: data.email
-    });
+    };
+    setUser(userData);
     setIsAuthenticated(true);
+    localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const logout = () => {
@@ -69,10 +77,11 @@ export const AuthProvider = ({ children }) => {
     }).finally(() => {
       setUser(null);
       setIsAuthenticated(false);
+      localStorage.removeItem('user');
     });
   };
 
-  if (checking) return null; // или спиннер
+  if (checking) return null;
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUser }}>
