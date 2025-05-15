@@ -234,18 +234,29 @@ app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 async function fetchMetricValue(metricName, promQuery) {
   try {
     const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
-    const track = await Trackable.findOne({
-      where: { user_id: null, metric_id: metric.id }
+    
+    // Проверяем, есть ли хоть один пользователь, отслеживающий эту метрику
+    const trackables = await Trackable.findAll({
+      where: { metric_id: metric.id }
     });
+
+    // Если никто не отслеживает метрику, не делаем запрос к Prometheus
+    if (trackables.length === 0) {
+      return null;
+    }
 
     const response = await fetch(`http://prometheus:9090/api/v1/query?query=${promQuery}`);
     const data = await response.json();
 
     if (data.status === "success" && data.data.result.length) {
       const val = parseFloat(data.data.result[0].value[1]);
-      if (track) {
-        await MetricValue.create({ value: val, metric_id: metric.id });
-      }
+      
+      // Сохраняем значение, так как метрика отслеживается
+      await MetricValue.create({ 
+        value: val.toString(), // Убедимся, что значение сохраняется как строка
+        metric_id: metric.id 
+      });
+      
       return val;
     }
     console.warn(`No data returned from Prometheus for ${metricName}`);
@@ -313,35 +324,50 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
       where.name = { [Op.iLike]: `%${search.trim()}%` };
     }
 
-    // 4) INCLUDE для тегов
-    const includeTag = {
-      model: Tag,
-      attributes: ['id', 'name', 'color'],
-      through: { attributes: [] },  // убираем лишние поля из join‑таблицы
-    };
-
+    // 4) Подготовка запроса
+    let metricIds = null;
+    
     if (tags) {
-      // разобьём строку "1,2,3" в [1,2,3]
+      // Если есть фильтр по тегам, сначала найдем ID подходящих метрик
       const tagIds = tags
         .split(',')
         .map(s => parseInt(s, 10))
         .filter(n => !isNaN(n));
+
       if (tagIds.length) {
-        includeTag.where    = { id: tagIds };
-        includeTag.required = true;  // INNER JOIN, т.е. хотя бы один из указанных
+        const metricsWithTags = await Metric.findAll({
+          attributes: ['id'],
+          include: [{
+            model: Tag,
+            where: { id: tagIds },
+            attributes: [],
+            through: { attributes: [] }
+          }]
+        });
+        metricIds = metricsWithTags.map(m => m.id);
+        if (metricIds.length) {
+          where.id = { [Op.in]: metricIds };
+        } else {
+          // Если не нашли метрик с такими тегами, вернем пустой результат
+          return res.json([]);
+        }
       }
     }
 
-    // 5) Запрос с фильтрами
+    // 5) Основной запрос с включением ВСЕХ тегов
     const metrics = await Metric.findAll({
       where,
       attributes: ['id', 'name'],
-      include: [ includeTag ]
+      include: [{
+        model: Tag,
+        attributes: ['id', 'name', 'color'],
+        through: { attributes: [] }
+      }]
     });
 
     // 6) Отдаём в нужном формате
     const result = metrics.map(m => ({
-      id:   m.id,
+      id: m.id,
       name: m.name,
       tags: m.Tags.map(t => ({ id: t.id, name: t.name, color: t.color }))
     }));
@@ -788,6 +814,56 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
     res.json({ message: 'Deleted' });
   } catch (err) {
     console.error('DELETE /comments/:id error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// HTTP-эндпоинт для истории значений метрики
+app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
+  try {
+    const metricId = Number(req.params.metric_id);
+    const userId = req.user.id;
+    const { from, to, sort_by = 'date', order = 'asc' } = req.query;
+
+    // Проверяем, отслеживает ли пользователь эту метрику
+    const trackable = await Trackable.findOne({
+      where: { 
+        user_id: userId,
+        metric_id: metricId
+      }
+    });
+
+    if (!trackable) {
+      return res.status(403).json({ 
+        error: 'You are not tracking this metric' 
+      });
+    }
+
+    const where = { metric_id: metricId };
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt[Op.gte] = new Date(from);
+      if (to) where.createdAt[Op.lte] = new Date(to);
+    }
+
+    const orderField = sort_by === 'value' ? 'value' : 'createdAt';
+    const orderDir = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+
+    const values = await MetricValue.findAll({
+      where,
+      order: [[orderField, orderDir]],
+      attributes: ['value', 'createdAt']
+    });
+
+    // Форматируем значения для ответа
+    const result = values.map(v => ({
+      value: parseFloat(v.value),
+      date: v.createdAt
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error('Error fetching metric values:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
