@@ -15,172 +15,110 @@ import nodemailer from 'nodemailer';
 import { initializeAdminAccounts } from './init-admin-accounts.js';
 import PDFDocument from 'pdfkit';
 
+const FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: Number(process.env.SMTP_PORT) === 465, // true для 465, иначе false
+  secure: Number(process.env.SMTP_PORT) === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   }
 });
 
-
 async function sendHourlyNotifications() {
-  console.log('[DEBUG] Starting sendHourlyNotifications function...');
+  console.log('[DEBUG] Starting sendHourlyNotifications...');
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  try {
-    // берём все трекабельные метрики вместе с пользователем
-    const trackables = await Trackable.findAll({
-      where: {},
-      include: [
-        { model: User, attributes: ['email','username'] },
-        { model: Metric, attributes: ['name'] }
-      ]
+  // группируем по пользователям
+  const trackables = await Trackable.findAll({
+    where: {},
+    include: [
+      { model: User, attributes: ['email','username'] },
+      { model: Metric, attributes: ['name'] }
+    ]
+  });
+
+  const byUser = {};
+  for (let t of trackables) {
+    const { User: user, Metric: metric } = t;
+    if (!user.email) continue;
+    if (!byUser[user.username]) byUser[user.username] = { user, metrics: [] };
+    byUser[user.username].metrics.push({ metricName: metric.name, metricId: t.metric_id });
+  }
+
+  for (let { user, metrics } of Object.values(byUser)) {
+    console.log(`[DEBUG] Generating report for ${user.username}`);
+    const doc = new PDFDocument();
+    doc.registerFont('DejaVu', FONT_PATH);
+    doc.font('DejaVu');
+
+    // собираем в буфер
+    const chunks = [];
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
     });
 
-    console.log(`[DEBUG] Found ${trackables.length} trackable metrics`);
+    // шапка
+    doc.fontSize(20).text('Отчет по мониторингу', { align: 'center' }).moveDown();
+    doc.fontSize(14)
+       .text(`Пользователь: ${user.username}`)
+       .text(`Дата отчета: ${new Date().toLocaleString()}`)
+       .moveDown(2);
 
-    for (let tr of trackables) {
-      const { User: user, Metric: metric } = tr;
-      if (!user.email) {
-        console.log(`[DEBUG] Skipping metric ${metric.name} - no email for user ${user.username}`);
-        continue;
-      }
-
-      console.log(`[DEBUG] Processing metric ${metric.name} for user ${user.username}`);
-
-      // находим последние 5 значений этой метрики за последний час
-      const latestValues = await MetricValue.findAll({
-        where: {
-          metric_id: tr.metric_id,
-          createdAt: { [Op.gte]: oneHourAgo }
-        },
-        order: [['createdAt', 'DESC']],
+    // для каждой метрики создаем таблицу
+    for (let { metricName, metricId } of metrics) {
+      doc.fontSize(16).text(metricName, { underline: true }).moveDown(0.5);
+      const values = await MetricValue.findAll({
+        where: { metric_id: metricId, createdAt: { [Op.gte]: oneHourAgo } },
+        order: [['createdAt','DESC']],
         limit: 5
       });
 
-      console.log(`[DEBUG] Found ${latestValues.length} values for metric ${metric.name}`);
-
-      if (!latestValues.length) {
-        console.log(`[DEBUG] No values found for metric ${metric.name} - skipping`);
-        continue;
-      }
-
-      // Создаем PDF документ
-      console.log(`[DEBUG] Creating PDF for metric ${metric.name}`);
-      const doc = new PDFDocument();
-      
-      // Создаем Promise для ожидания завершения генерации PDF
-      const pdfPromise = new Promise((resolve, reject) => {
-        const chunks = [];
-        
-        doc.on('data', chunk => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', reject);
-        
-        // Добавляем заголовок
-        doc.fontSize(20)
-           .text('Отчет по мониторингу', { align: 'center' })
-           .moveDown();
-
-        doc.fontSize(14)
-           .text(`Пользователь: ${user.username}`)
-           .text(`Метрика: ${metric.name}`)
-           .text(`Дата отчета: ${new Date().toLocaleString()}`)
-           .moveDown();
-
-        // Создаем таблицу
-        const tableTop = doc.y;
-        const cellPadding = 10;
-        const colWidth = (doc.page.width - 100) / 2;
-
-        // Заголовки таблицы
-        doc.fontSize(12)
-           .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
-           .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
-
-        let rowTop = tableTop + 25;
-
-        // Данные таблицы
-        latestValues.forEach((value, i) => {
-          doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
-             .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
-        });
-
-        // Рисуем линии таблицы
-        doc.lineWidth(1);
-        
-        // Горизонтальные линии
-        for (let i = 0; i <= latestValues.length; i++) {
-          doc.moveTo(50, tableTop + i * 25)
-             .lineTo(50 + colWidth * 2, tableTop + i * 25)
-             .stroke();
-        }
-
-        // Вертикальные линии
-        doc.moveTo(50, tableTop)
-           .lineTo(50, tableTop + latestValues.length * 25)
-           .stroke();
-        doc.moveTo(50 + colWidth, tableTop)
-           .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
-           .stroke();
-        doc.moveTo(50 + colWidth * 2, tableTop)
-           .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
-           .stroke();
-
-        // Добавляем печать
-        doc.moveDown(4)
-           .fontSize(12)
-           .text('Документ сформирован автоматически', { align: 'right' })
-           .text('Мониторинговая система', { align: 'right' })
-           .text(new Date().toLocaleDateString(), { align: 'right' });
-
-        // Завершаем документ
-        doc.end();
+      // заголовки
+      const tableTop = doc.y;
+      const colW = 200;
+      doc.fontSize(12)
+         .text('Значение', 50, tableTop, { width: colW, align: 'center' })
+         .text('Время', 50 + colW, tableTop, { width: colW, align: 'center' });
+      let row = tableTop + 25;
+      values.forEach(v => {
+        doc.text(v.value, 50, row, { width: colW, align: 'center' })
+           .text(new Date(v.createdAt).toLocaleString(), 50 + colW, row, { width: colW, align: 'center' });
+        row += 25;
       });
-
-      console.log(`[DEBUG] Waiting for PDF generation to complete for metric ${metric.name}...`);
-      
-      try {
-        // Дожидаемся завершения генерации PDF
-        const pdfBuffer = await pdfPromise;
-        console.log(`[DEBUG] PDF buffer created, size: ${pdfBuffer.length} bytes`);
-
-        // Проверяем настройки SMTP
-        console.log('[DEBUG] SMTP Settings:', {
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT,
-          secure: Number(process.env.SMTP_PORT) === 465,
-          user: process.env.SMTP_USER ? 'Set' : 'Not set',
-          from: process.env.FROM_EMAIL ? 'Set' : 'Not set'
-        });
-
-        // Отправляем email с PDF
-        await transporter.sendMail({
-          from: process.env.FROM_EMAIL,
-          to: user.email,
-          subject: `Отчет по метрике ${metric.name}`,
-          text: `Прикрепляем отчет по метрике "${metric.name}" за последний час.`,
-          attachments: [{
-            filename: `report_${metric.name}_${new Date().toISOString()}.pdf`,
-            content: pdfBuffer
-          }]
-        });
-        console.log(`[MAIL] Отправлен отчет ${metric.name} -> ${user.email}`);
-      } catch (err) {
-        console.error(`[MAIL_ERROR] Не удалось отправить отчет ${metric.name} пользователю ${user.email}:`, err);
-        console.error('[MAIL_ERROR] Full error:', err);
-      }
+      // линии
+      doc.moveTo(50, tableTop).lineTo(50 + colW*2, tableTop).stroke();
+      doc.moveTo(50, row).lineTo(50 + colW*2, row).stroke();
+      doc.moveTo(50, tableTop).lineTo(50, row).stroke();
+      doc.moveTo(50+colW, tableTop).lineTo(50+colW, row).stroke();
+      doc.moveTo(50+colW*2, tableTop).lineTo(50+colW*2, row).stroke();
+      doc.moveDown(2);
     }
-  } catch (err) {
-    console.error('[ERROR] Error in sendHourlyNotifications:', err);
-    console.error('[ERROR] Full error stack:', err.stack);
+
+    doc.fontSize(10).text('Документ сформирован автоматически', { align: 'right' });
+    doc.end();
+
+    const pdfBuffer = await pdfPromise;
+    console.log(`[DEBUG] PDF ready for ${user.username}`);
+
+    // отправляем одним письмом
+    await transporter.sendMail({
+      from: process.env.FROM_EMAIL,
+      to: user.email,
+      subject: `Ежечасной отчет мониторинга для ${user.username}`,
+      text: `Здравствуйте, ${user.username}! В приложении вы найдете единый отчет по всем вашим метрикам за последний час.`,
+      attachments: [{ filename: `report_${user.username}_${new Date().toISOString()}.pdf`, content: pdfBuffer }]
+    });
+    console.log(`[MAIL] Sent aggregated report to ${user.email}`);
   }
 }
 
-
+// Таймеры
+setTimeout(() => { sendHourlyNotifications(); setInterval(sendHourlyNotifications, 3600e3); }, 5000);
 // Заменяем простой setInterval на комбинацию setTimeout и setInterval
 console.log('[DEBUG] Setting up notification timers...');
 setTimeout(() => {
