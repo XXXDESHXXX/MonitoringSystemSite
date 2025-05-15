@@ -1,4 +1,4 @@
-export const BASE_API_URL = 'http://monitoringsite.online';
+export const BASE_API_URL = 'https://monitoringsite.online';
 
 export const API_ENDPOINTS = {
   // Auth

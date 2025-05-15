@@ -206,7 +206,7 @@ const app = express();
 const httpServer = createServer(app);
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://monitoringsite.online',
+  origin: process.env.FRONTEND_URL || 'https://monitoringsite.online',
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
