@@ -7,22 +7,35 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [checking, setChecking] = useState(true);
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('user');
-  });
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // При старте приложения проверяем сохраненную сессию
+  // При старте приложения получаем данные о пользователе
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setIsAuthenticated(true);
-    }
-    setChecking(false);
+    fetch(getAbsoluteURL(API_ENDPOINTS.me), {
+      credentials: 'include'
+    })
+      .then(async res => {
+        if (res.ok) {
+          const data = await res.json();
+          // Ожидаем { id, username, role, email }
+          setUser({
+            id: data.id,
+            username: data.username,
+            role: data.role,
+            email: data.email
+          });
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      })
+      .catch(() => {
+        setUser(null);
+        setIsAuthenticated(false);
+      })
+      .finally(() => setChecking(false));
   }, []);
 
   const login = async (username, password) => {
@@ -33,26 +46,33 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ username, password })
     });
 
-    const data = await res.json();
+    // пытаемся прочитать JSON с ошибкой или данными
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || 'Login failed');
     }
 
-    // Сохраняем пользователя в localStorage
-    localStorage.setItem('user', JSON.stringify(data));
-    setUser(data);
+    // Успешно: сохраняем пользователя
+    setUser({
+      id: data.id,
+      username: data.username,
+      role: data.role,
+      email: data.email
+    });
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    setIsAuthenticated(false);
+    fetch(getAbsoluteURL(API_ENDPOINTS.logout), {
+      method: 'POST',
+      credentials: 'include'
+    }).finally(() => {
+      setUser(null);
+      setIsAuthenticated(false);
+    });
   };
 
-  if (checking) {
-    return <div>Loading...</div>;
-  }
+  if (checking) return null; // или спиннер
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUser }}>
