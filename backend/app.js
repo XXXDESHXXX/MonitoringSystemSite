@@ -15,7 +15,7 @@ import nodemailer from 'nodemailer';
 import { initializeAdminAccounts } from './init-admin-accounts.js';
 import PDFDocument from 'pdfkit';
 
-const FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+const FONT_PATH = '/usr/share/fonts/dejavu/DejaVuSans.ttf';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
