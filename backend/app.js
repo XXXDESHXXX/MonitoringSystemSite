@@ -162,8 +162,7 @@ app.use(session({
     sameSite: 'lax',
     secure: false,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 часа
-    domain: process.env.NODE_ENV === 'production' ? '.monitoringsite.online' : undefined
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 

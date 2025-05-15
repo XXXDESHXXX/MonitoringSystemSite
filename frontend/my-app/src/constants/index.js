@@ -2,6 +2,7 @@ export const BASE_API_URL = 'https://monitoringsite.online';
 
 export const API_ENDPOINTS = {
   // Auth
+  me: '/api/auth/me',
   login: '/api/auth/login',
   logout: '/api/auth/logout',
   register: '/api/auth/register',
