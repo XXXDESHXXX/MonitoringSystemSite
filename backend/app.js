@@ -11,7 +11,6 @@ import { ensureAuthenticated } from "./middleware/auth.js";
 import { ensureAdmin } from './middleware/admin.js';
 import adminRouter from './routes/admin.js';
 import db from './models/index.js';
-import { Server as SocketIO } from "socket.io";
 import nodemailer from 'nodemailer';
 import { initializeAdminAccounts } from './init-admin-accounts.js';
 import PDFDocument from 'pdfkit';
@@ -193,30 +192,13 @@ import MetricValue from "./models/MetricValue.js";
 import Tag from './models/Tag.js';
 import MetricTag from './models/MetricTag.js';
 import Comment from './models/Comment.js';
-import User    from './models/User.js';
+import User from './models/User.js';
 
 import { Op } from 'sequelize';
 
 const app = express();
 const httpServer = createServer(app);
-const io = new SocketIO(httpServer, {
-  cors: { 
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-  },
-  path: '/socket.io',
-  transports: ['websocket'],
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  cookie: {
-    name: 'io',
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax'
-  }
-});
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
@@ -248,27 +230,8 @@ app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
 app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
-// Socket.IO — подписка на комнаты по метрике
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
 
-  socket.on('subscribe', ({ metricId }) => {
-    console.log(`Client ${socket.id} subscribed to metric ${metricId}`);
-    socket.join(`metric-${metricId}`);
-  });
-
-  socket.on('unsubscribe', ({ metricId }) => {
-    console.log(`Client ${socket.id} unsubscribed from metric ${metricId}`);
-    socket.leave(`metric-${metricId}`);
-  });
-});
-
-// При создании новых значений — эмитим событие
-async function fetchAndEmit(metricName, promQuery, jsonKey) {
+async function fetchMetricValue(metricName, promQuery) {
   try {
     const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
     const track = await Trackable.findOne({
@@ -280,27 +243,38 @@ async function fetchAndEmit(metricName, promQuery, jsonKey) {
 
     if (data.status === "success" && data.data.result.length) {
       const val = parseFloat(data.data.result[0].value[1]);
-      
       if (track) {
         await MetricValue.create({ value: val, metric_id: metric.id });
       }
-
-      // Эмитим событие всем клиентам в комнате
-      io.to(`metric-${metric.id}`).emit("newValue", {
-        metricId: metric.id,
-        value: val,
-        date: new Date().toISOString()
-      });
-
-      console.log(`Emitted new value for ${metricName}:`, val);
-    } else {
-      console.warn(`No data returned from Prometheus for ${metricName}`);
+      return val;
     }
+    console.warn(`No data returned from Prometheus for ${metricName}`);
+    return null;
   } catch (error) {
-    console.error(`Error in fetchAndEmit for ${metricName}:`, error);
+    console.error(`Error in fetchMetricValue for ${metricName}:`, error);
+    return null;
   }
 }
 
+// Обновляем значения метрик каждые 5 секунд
+setInterval(async () => {
+  await fetchMetricValue("LOAD_AVERAGE", "node_load1");
+  await fetchMetricValue("NODE_CPU_SECONDS_TOTAL", "node_cpu_seconds_total");
+  await fetchMetricValue("NODE_MEMORY_MEMFREE_BYTES", "node_memory_MemFree_bytes");
+  await fetchMetricValue("NODE_MEMORY_TOTAL_BYTES", "node_memory_MemTotal_bytes");
+  await fetchMetricValue("NODE_CPU_USAGE_PERCENT", "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)");
+  await fetchMetricValue("NODE_DISK_READ_BYTES", "node_disk_read_bytes_total");
+  await fetchMetricValue("NODE_DISK_WRITE_BYTES", "node_disk_written_bytes_total");
+  await fetchMetricValue("NODE_MEMORY_CACHED_BYTES", "node_memory_Cached_bytes");
+  await fetchMetricValue("NODE_DISK_IO_TIME", "node_disk_io_time_seconds_total");
+  await fetchMetricValue("NODE_UPTIME", "node_time_seconds - node_boot_time_seconds");
+  await fetchMetricValue("NODE_NETWORK_RECEIVE_BYTES", "rate(node_network_receive_bytes_total[1m])");
+  await fetchMetricValue("NODE_DISK_USAGE_PERCENT", "(node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_free_bytes{mountpoint=\"/\"}) * 100 / node_filesystem_size_bytes{mountpoint=\"/\"}");
+  await fetchMetricValue("NODE_MEMORY_USAGE_PERCENT", "100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)");
+  await fetchMetricValue("NODE_PROCESS_COUNT", "node_procs_running");
+}, 5000);
+
+// Инициализация базы данных
 (async () => {
   try {
     await sequelize.sync();
@@ -815,229 +789,6 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('DELETE /comments/:id error', err);
     res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-
-// Стримим каждые 5 секунд значение Load Average
-setInterval(
-  () => fetchAndEmit("LOAD_AVERAGE", "node_load1"),
-  5000
-);
-
-// Стримим каждые 5 секунд значение CPU Seconds Total
-setInterval(
-  () => fetchAndEmit("NODE_CPU_SECONDS_TOTAL", "node_cpu_seconds_total"),
-  5000
-);
-
-// Стримим каждые 5 секунд значение Memory MemFree Bytes
-setInterval(
-  () => fetchAndEmit("NODE_MEMORY_MEMFREE_BYTES", "node_memory_MemFree_bytes"),
-  5000
-);
-
-// Add new interval fetches for the new metrics
-setInterval(
-  () => fetchAndEmit("NODE_MEMORY_TOTAL_BYTES", "node_memory_MemTotal_bytes"),
-  5000
-);
-
-setInterval(
-  () => fetchAndEmit("NODE_CPU_USAGE_PERCENT", "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)"),
-  5000
-);
-
-setInterval(
-  () => fetchAndEmit("NODE_DISK_READ_BYTES", "node_disk_read_bytes_total"),
-  5000
-);
-
-// New endpoint for network receive bytes
-app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
-  try {
-    const [metric] = await Metric.findOrCreate({
-      where: { name: 'NODE_NETWORK_RECEIVE_BYTES' },
-      defaults: { name: 'NODE_NETWORK_RECEIVE_BYTES' }
-    });
-    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://prometheus:9090/api/v1/query?query=rate(node_network_receive_bytes_total[1m])');
-    const data = await response.json();
-    if (data.status === 'success' && data.data.result.length > 0) {
-      const val = parseFloat(data.data.result[0].value[1]);
-      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
-      return res.json({ node_network_receive_bytes: val });
-    }
-    res.status(500).json({ error: 'No data returned from Prometheus' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch data' });
-  }
-});
-
-// New endpoint for disk space usage percentage
-app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
-  try {
-    console.log('Starting disk usage percent request...');
-    
-    const [metric] = await Metric.findOrCreate({
-      where: { name: 'NODE_DISK_USAGE_PERCENT' },
-      defaults: { name: 'NODE_DISK_USAGE_PERCENT' }
-    });
-    console.log('Metric found/created:', metric.name);
-
-    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    console.log('Trackable found:', !!track);
-
-    // Сначала получим список всех метрик файловой системы
-    const listUrl = 'http://prometheus:9090/api/v1/query?query=node_filesystem_size_bytes';
-    console.log('Listing filesystem metrics:', listUrl);
-    
-    const listResponse = await fetch(listUrl);
-    const listData = await listResponse.json();
-    console.log('Available filesystem metrics:', JSON.stringify(listData, null, 2));
-
-    // Теперь используем правильный mountpoint
-    const prometheusUrl = 'http://prometheus:9090/api/v1/query?query=(node_filesystem_size_bytes{mountpoint=~".*"} - node_filesystem_free_bytes{mountpoint=~".*"}) * 100 / node_filesystem_size_bytes{mountpoint=~".*"}';
-    console.log('Prometheus URL:', prometheusUrl);
-
-    const response = await fetch(prometheusUrl);
-    console.log('Prometheus response status:', response.status);
-    
-    const data = await response.json();
-    console.log('Prometheus data:', JSON.stringify(data, null, 2));
-
-    if (data.status === 'success' && data.data.result.length > 0) {
-      // Берем первое значение из результатов
-      const val = parseFloat(data.data.result[0].value[1]);
-      console.log('Parsed value:', val);
-
-      if (track) {
-        await MetricValue.create({ value: val, metric_id: metric.id });
-        console.log('Metric value created');
-      }
-
-      return res.json({ node_disk_usage_percent: val });
-    }
-
-    console.log('No data returned from Prometheus');
-    res.status(500).json({ error: 'No data returned from Prometheus' });
-  } catch (error) {
-    console.error('Error in disk usage percent endpoint:', error);
-    res.status(500).json({ error: 'Failed to fetch data', details: error.message });
-  }
-});
-
-// New endpoint for memory usage percentage
-app.get('/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, res) => {
-  try {
-    const [metric] = await Metric.findOrCreate({
-      where: { name: 'NODE_MEMORY_USAGE_PERCENT' },
-      defaults: { name: 'NODE_MEMORY_USAGE_PERCENT' }
-    });
-    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://prometheus:9090/api/v1/query?query=100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)');
-    const data = await response.json();
-    if (data.status === 'success' && data.data.result.length > 0) {
-      const val = parseFloat(data.data.result[0].value[1]);
-      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
-      return res.json({ node_memory_usage_percent: val });
-    }
-    res.status(500).json({ error: 'No data returned from Prometheus' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch data' });
-  }
-});
-
-// New endpoint for process count
-app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => {
-  try {
-    const [metric] = await Metric.findOrCreate({
-      where: { name: 'NODE_PROCESS_COUNT' },
-      defaults: { name: 'NODE_PROCESS_COUNT' }
-    });
-    const track = await Trackable.findOne({ where: { user_id: req.user.id, metric_id: metric.id } });
-    const response = await fetch('http://prometheus:9090/api/v1/query?query=node_procs_running');
-    const data = await response.json();
-    if (data.status === 'success' && data.data.result.length > 0) {
-      const val = parseFloat(data.data.result[0].value[1]);
-      if (track) await MetricValue.create({ value: val, metric_id: metric.id });
-      return res.json({ node_process_count: val });
-    }
-    res.status(500).json({ error: 'No data returned from Prometheus' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch data' });
-  }
-});
-
-// Add new interval fetches for the new metrics
-setInterval(
-  () => fetchAndEmit("NODE_NETWORK_RECEIVE_BYTES", "rate(node_network_receive_bytes_total[1m])"),
-  5000
-);
-
-setInterval(
-  () => fetchAndEmit("NODE_DISK_USAGE_PERCENT", "(node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_free_bytes{mountpoint=\"/\"}) * 100 / node_filesystem_size_bytes{mountpoint=\"/\"}"),
-  5000
-);
-
-setInterval(
-  () => fetchAndEmit("NODE_MEMORY_USAGE_PERCENT", "100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)"),
-  5000
-);
-
-setInterval(
-  () => fetchAndEmit("NODE_PROCESS_COUNT", "node_procs_running"),
-  5000
-);
-
-// HTTP-эндпоинт для истории без realtime (для initial load)
-app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
-  try {
-    const metricId = Number(req.params.metric_id);
-    const { from, to, sort_by = 'date', order = 'asc' } = req.query;
-
-    const where = { metric_id: metricId };
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt[Op.gte] = new Date(from);
-      if (to)   where.createdAt[Op.lte] = new Date(to);
-    }
-
-    const orderField = sort_by === 'value' ? 'value' : 'createdAt';
-    const orderDir   = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-
-    const vals = await MetricValue.findAll({
-      where,
-      order: [[ orderField, orderDir ]],
-      attributes: ['value','createdAt']
-    });
-
-    // уникальные
-    const seen = new Set();
-    const unique = vals.filter(v => {
-      if (seen.has(v.value)) return false;
-      seen.add(v.value);
-      return true;
-    });
-
-    res.json(unique.map(v => ({ value: v.value, date: v.createdAt })));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/metrics/node_network_transmit_bytes', ensureAuthenticated, async (req, res) => {
-  try {
-    const response = await fetch(`http://prometheus:9090/api/v1/query?query=rate(node_network_transmit_bytes_total[1m])`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching network transmit data:', error);
-    res.status(500).json({ error: 'Failed to fetch network transmit data' });
   }
 });
 
