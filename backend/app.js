@@ -14,6 +14,7 @@ import db from './models/index.js';
 import { Server as SocketIO } from "socket.io";
 import nodemailer from 'nodemailer';
 import { initializeAdminAccounts } from './init-admin-accounts.js';
+import PDFDocument from 'pdfkit';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -40,47 +41,116 @@ async function sendHourlyNotifications() {
 
   for (let tr of trackables) {
     const { User: user, Metric: metric } = tr;
-    if (!user.email) continue; // если нет почты — пропускаем
+    if (!user.email) continue;
 
-    // находим последнее значение этой метрики за последний час
-    const latest = await MetricValue.findOne({
+    // находим последние 5 значений этой метрики за последний час
+    const latestValues = await MetricValue.findAll({
       where: {
         metric_id: tr.metric_id,
         createdAt: { [Op.gte]: oneHourAgo }
       },
-      order: [['createdAt','DESC']]
+      order: [['createdAt', 'DESC']],
+      limit: 5
     });
 
-    if (!latest) continue; // если за час не было записей — ничего не отправляем
+    if (!latestValues.length) continue;
 
-    // готовим текст письма
-    const subject = `Обновление метрики ${metric.name}`;
-    const text = `
-Привет, ${user.username}!
+    // Создаем PDF документ
+    const doc = new PDFDocument();
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    
+    // Добавляем заголовок
+    doc.fontSize(20)
+       .text('Отчет по мониторингу', { align: 'center' })
+       .moveDown();
 
-За последний час метрика "${metric.name}" изменилась, последнее значение:
-  ${latest.value}
-  (время измерения: ${latest.createdAt.toLocaleString()})
+    doc.fontSize(14)
+       .text(`Пользователь: ${user.username}`)
+       .text(`Метрика: ${metric.name}`)
+       .text(`Дата отчета: ${new Date().toLocaleString()}`)
+       .moveDown();
 
-Спасибо, что пользуетесь нашим сервисом!
-`;
+    // Создаем таблицу
+    const tableTop = doc.y;
+    const cellPadding = 10;
+    const colWidth = (doc.page.width - 100) / 2;
 
+    // Заголовки таблицы
+    doc.fontSize(12)
+       .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
+       .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
+
+    let rowTop = tableTop + 25;
+
+    // Данные таблицы
+    latestValues.forEach((value, i) => {
+      doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
+         .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
+    });
+
+    // Рисуем линии таблицы
+    doc.lineWidth(1);
+    
+    // Горизонтальные линии
+    for (let i = 0; i <= latestValues.length; i++) {
+      doc.moveTo(50, tableTop + i * 25)
+         .lineTo(50 + colWidth * 2, tableTop + i * 25)
+         .stroke();
+    }
+
+    // Вертикальные линии
+    doc.moveTo(50, tableTop)
+       .lineTo(50, tableTop + latestValues.length * 25)
+       .stroke();
+    doc.moveTo(50 + colWidth, tableTop)
+       .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
+       .stroke();
+    doc.moveTo(50 + colWidth * 2, tableTop)
+       .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
+       .stroke();
+
+    // Добавляем печать
+    doc.moveDown(4)
+       .fontSize(12)
+       .text('Документ сформирован автоматически', { align: 'right' })
+       .text('Мониторинговая система', { align: 'right' })
+       .text(new Date().toLocaleDateString(), { align: 'right' });
+
+    // Завершаем документ
+    doc.end();
+
+    // Собираем все чанки в буфер
+    const pdfBuffer = Buffer.concat(chunks);
+
+    // Отправляем email с PDF
     try {
       await transporter.sendMail({
         from: process.env.FROM_EMAIL,
         to: user.email,
-        subject,
-        text
+        subject: `Отчет по метрике ${metric.name}`,
+        text: `Прикрепляем отчет по метрике "${metric.name}" за последний час.`,
+        attachments: [{
+          filename: `report_${metric.name}_${new Date().toISOString()}.pdf`,
+          content: pdfBuffer
+        }]
       });
-      console.log(`[MAIL] Отправлено ${metric.name} -> ${user.email}`);
+      console.log(`[MAIL] Отправлен отчет ${metric.name} -> ${user.email}`);
     } catch (err) {
-      console.error(`[MAIL_ERROR] Не удалось отправить ${metric.name} пользователю ${user.email}:`, err);
+      console.error(`[MAIL_ERROR] Не удалось отправить отчет ${metric.name} пользователю ${user.email}:`, err);
     }
   }
 }
 
 
-setInterval(sendHourlyNotifications, 60 * 60 * 1000);
+// Заменяем простой setInterval на комбинацию setTimeout и setInterval
+setTimeout(() => {
+  // Первый запуск через 5 секунд
+  sendHourlyNotifications();
+  
+  // Последующие запуски каждый час
+  setInterval(sendHourlyNotifications, 60 * 60 * 1000);
+}, 5000);
 
 // Модели
 import Metric from "./models/Metric.js";
