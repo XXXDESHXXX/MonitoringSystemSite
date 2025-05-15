@@ -147,9 +147,11 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'https://monitoringsite.online',
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cookie"],
   exposedHeaders: ["Set-Cookie"],
-  maxAge: 86400
+  maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 app.use(express.json());
 
@@ -159,10 +161,11 @@ app.use(session({
   resave: true,
   saveUninitialized: true,
   cookie: {
-    sameSite: 'lax',
-    secure: false,
+    sameSite: 'none',
+    secure: true,
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000,
+    domain: 'monitoringsite.online'
   }
 }));
 
