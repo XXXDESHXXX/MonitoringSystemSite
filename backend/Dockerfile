@@ -1,26 +1,29 @@
 FROM node:18-alpine
 
+# Устанавливаем системные зависимости и DejaVu‑шрифты
+RUN apk update && \
+    apk add --no-cache \
+      ttf-dejavu \
+      fontconfig \
+      ca-certificates
+
 WORKDIR /app
 
-# Установка зависимостей
+# Копируем package.json и устанавливаем зависимости
 COPY package*.json ./
 RUN npm install
 
-# Копирование исходного кода
+# Копируем исходники
 COPY . .
 
-# Установка PM2 глобально
+# Устанавливаем PM2 для продакшен‑запуска
 RUN npm install -g pm2
 
-# Создание непривилегированного пользователя
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown -R appuser:appgroup /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
 
-# Переключение на непривилегированного пользователя
 USER appuser
 
-# Открытие порта
 EXPOSE 5000
 
-# Запуск приложения через PM2
 CMD ["pm2-runtime", "start", "app.js"]
