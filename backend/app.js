@@ -13,6 +13,7 @@ import adminRouter from './routes/admin.js';
 import db from './models/index.js';
 import { Server as SocketIO } from "socket.io";
 import nodemailer from 'nodemailer';
+import { initializeAdminAccounts } from './init-admin-accounts.js';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -198,6 +199,8 @@ async function fetchAndEmit(metricName, promQuery, jsonKey) {
 
 (async () => {
   try {
+    await sequelize.sync();
+    await initializeAdminAccounts();
     await db.sequelize.authenticate();
     await db.sequelize.sync({ alter: true });
     console.log('База данных подключена и таблички синхронизированы');
