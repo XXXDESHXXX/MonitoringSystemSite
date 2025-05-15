@@ -28,127 +28,161 @@ const transporter = nodemailer.createTransport({
 
 
 async function sendHourlyNotifications() {
+  console.log('[DEBUG] Starting sendHourlyNotifications function...');
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  // берём все трекабельные метрики вместе с пользователем
-  const trackables = await Trackable.findAll({
-    where: {},
-    include: [
-      { model: User, attributes: ['email','username'] },
-      { model: Metric, attributes: ['name'] }
-    ]
-  });
-
-  for (let tr of trackables) {
-    const { User: user, Metric: metric } = tr;
-    if (!user.email) continue;
-
-    // находим последние 5 значений этой метрики за последний час
-    const latestValues = await MetricValue.findAll({
-      where: {
-        metric_id: tr.metric_id,
-        createdAt: { [Op.gte]: oneHourAgo }
-      },
-      order: [['createdAt', 'DESC']],
-      limit: 5
+  try {
+    // берём все трекабельные метрики вместе с пользователем
+    const trackables = await Trackable.findAll({
+      where: {},
+      include: [
+        { model: User, attributes: ['email','username'] },
+        { model: Metric, attributes: ['name'] }
+      ]
     });
 
-    if (!latestValues.length) continue;
+    console.log(`[DEBUG] Found ${trackables.length} trackable metrics`);
 
-    // Создаем PDF документ
-    const doc = new PDFDocument();
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
-    
-    // Добавляем заголовок
-    doc.fontSize(20)
-       .text('Отчет по мониторингу', { align: 'center' })
-       .moveDown();
+    for (let tr of trackables) {
+      const { User: user, Metric: metric } = tr;
+      if (!user.email) {
+        console.log(`[DEBUG] Skipping metric ${metric.name} - no email for user ${user.username}`);
+        continue;
+      }
 
-    doc.fontSize(14)
-       .text(`Пользователь: ${user.username}`)
-       .text(`Метрика: ${metric.name}`)
-       .text(`Дата отчета: ${new Date().toLocaleString()}`)
-       .moveDown();
+      console.log(`[DEBUG] Processing metric ${metric.name} for user ${user.username}`);
 
-    // Создаем таблицу
-    const tableTop = doc.y;
-    const cellPadding = 10;
-    const colWidth = (doc.page.width - 100) / 2;
-
-    // Заголовки таблицы
-    doc.fontSize(12)
-       .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
-       .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
-
-    let rowTop = tableTop + 25;
-
-    // Данные таблицы
-    latestValues.forEach((value, i) => {
-      doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
-         .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
-    });
-
-    // Рисуем линии таблицы
-    doc.lineWidth(1);
-    
-    // Горизонтальные линии
-    for (let i = 0; i <= latestValues.length; i++) {
-      doc.moveTo(50, tableTop + i * 25)
-         .lineTo(50 + colWidth * 2, tableTop + i * 25)
-         .stroke();
-    }
-
-    // Вертикальные линии
-    doc.moveTo(50, tableTop)
-       .lineTo(50, tableTop + latestValues.length * 25)
-       .stroke();
-    doc.moveTo(50 + colWidth, tableTop)
-       .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
-       .stroke();
-    doc.moveTo(50 + colWidth * 2, tableTop)
-       .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
-       .stroke();
-
-    // Добавляем печать
-    doc.moveDown(4)
-       .fontSize(12)
-       .text('Документ сформирован автоматически', { align: 'right' })
-       .text('Мониторинговая система', { align: 'right' })
-       .text(new Date().toLocaleDateString(), { align: 'right' });
-
-    // Завершаем документ
-    doc.end();
-
-    // Собираем все чанки в буфер
-    const pdfBuffer = Buffer.concat(chunks);
-
-    // Отправляем email с PDF
-    try {
-      await transporter.sendMail({
-        from: process.env.FROM_EMAIL,
-        to: user.email,
-        subject: `Отчет по метрике ${metric.name}`,
-        text: `Прикрепляем отчет по метрике "${metric.name}" за последний час.`,
-        attachments: [{
-          filename: `report_${metric.name}_${new Date().toISOString()}.pdf`,
-          content: pdfBuffer
-        }]
+      // находим последние 5 значений этой метрики за последний час
+      const latestValues = await MetricValue.findAll({
+        where: {
+          metric_id: tr.metric_id,
+          createdAt: { [Op.gte]: oneHourAgo }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 5
       });
-      console.log(`[MAIL] Отправлен отчет ${metric.name} -> ${user.email}`);
-    } catch (err) {
-      console.error(`[MAIL_ERROR] Не удалось отправить отчет ${metric.name} пользователю ${user.email}:`, err);
+
+      console.log(`[DEBUG] Found ${latestValues.length} values for metric ${metric.name}`);
+
+      if (!latestValues.length) {
+        console.log(`[DEBUG] No values found for metric ${metric.name} - skipping`);
+        continue;
+      }
+
+      // Создаем PDF документ
+      console.log(`[DEBUG] Creating PDF for metric ${metric.name}`);
+      const doc = new PDFDocument();
+      const chunks = [];
+      doc.on('data', chunk => chunks.push(chunk));
+      
+      // Добавляем заголовок
+      doc.fontSize(20)
+         .text('Отчет по мониторингу', { align: 'center' })
+         .moveDown();
+
+      doc.fontSize(14)
+         .text(`Пользователь: ${user.username}`)
+         .text(`Метрика: ${metric.name}`)
+         .text(`Дата отчета: ${new Date().toLocaleString()}`)
+         .moveDown();
+
+      // Создаем таблицу
+      const tableTop = doc.y;
+      const cellPadding = 10;
+      const colWidth = (doc.page.width - 100) / 2;
+
+      // Заголовки таблицы
+      doc.fontSize(12)
+         .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
+         .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
+
+      let rowTop = tableTop + 25;
+
+      // Данные таблицы
+      latestValues.forEach((value, i) => {
+        doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
+           .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
+      });
+
+      // Рисуем линии таблицы
+      doc.lineWidth(1);
+      
+      // Горизонтальные линии
+      for (let i = 0; i <= latestValues.length; i++) {
+        doc.moveTo(50, tableTop + i * 25)
+           .lineTo(50 + colWidth * 2, tableTop + i * 25)
+           .stroke();
+      }
+
+      // Вертикальные линии
+      doc.moveTo(50, tableTop)
+         .lineTo(50, tableTop + latestValues.length * 25)
+         .stroke();
+      doc.moveTo(50 + colWidth, tableTop)
+         .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
+         .stroke();
+      doc.moveTo(50 + colWidth * 2, tableTop)
+         .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
+         .stroke();
+
+      // Добавляем печать
+      doc.moveDown(4)
+         .fontSize(12)
+         .text('Документ сформирован автоматически', { align: 'right' })
+         .text('Мониторинговая система', { align: 'right' })
+         .text(new Date().toLocaleDateString(), { align: 'right' });
+
+      // Завершаем документ
+      doc.end();
+
+      console.log(`[DEBUG] PDF created for metric ${metric.name}, waiting for chunks...`);
+
+      // Собираем все чанки в буфер
+      const pdfBuffer = Buffer.concat(chunks);
+      console.log(`[DEBUG] PDF buffer created, size: ${pdfBuffer.length} bytes`);
+
+      // Проверяем настройки SMTP
+      console.log('[DEBUG] SMTP Settings:', {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: Number(process.env.SMTP_PORT) === 465,
+        user: process.env.SMTP_USER ? 'Set' : 'Not set',
+        from: process.env.FROM_EMAIL ? 'Set' : 'Not set'
+      });
+
+      // Отправляем email с PDF
+      try {
+        console.log(`[DEBUG] Attempting to send email to ${user.email}`);
+        await transporter.sendMail({
+          from: process.env.FROM_EMAIL,
+          to: user.email,
+          subject: `Отчет по метрике ${metric.name}`,
+          text: `Прикрепляем отчет по метрике "${metric.name}" за последний час.`,
+          attachments: [{
+            filename: `report_${metric.name}_${new Date().toISOString()}.pdf`,
+            content: pdfBuffer
+          }]
+        });
+        console.log(`[MAIL] Отправлен отчет ${metric.name} -> ${user.email}`);
+      } catch (err) {
+        console.error(`[MAIL_ERROR] Не удалось отправить отчет ${metric.name} пользователю ${user.email}:`, err);
+        console.error('[MAIL_ERROR] Full error:', err);
+      }
     }
+  } catch (err) {
+    console.error('[ERROR] Error in sendHourlyNotifications:', err);
+    console.error('[ERROR] Full error stack:', err.stack);
   }
 }
 
 
 // Заменяем простой setInterval на комбинацию setTimeout и setInterval
+console.log('[DEBUG] Setting up notification timers...');
 setTimeout(() => {
-  // Первый запуск через 5 секунд
+  console.log('[DEBUG] Running first notification...');
   sendHourlyNotifications();
   
-  // Последующие запуски каждый час
+  console.log('[DEBUG] Setting up hourly interval...');
   setInterval(sendHourlyNotifications, 60 * 60 * 1000);
 }, 5000);
 
