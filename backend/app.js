@@ -71,87 +71,93 @@ async function sendHourlyNotifications() {
       // Создаем PDF документ
       console.log(`[DEBUG] Creating PDF for metric ${metric.name}`);
       const doc = new PDFDocument();
-      const chunks = [];
-      doc.on('data', chunk => chunks.push(chunk));
       
-      // Добавляем заголовок
-      doc.fontSize(20)
-         .text('Отчет по мониторингу', { align: 'center' })
-         .moveDown();
+      // Создаем Promise для ожидания завершения генерации PDF
+      const pdfPromise = new Promise((resolve, reject) => {
+        const chunks = [];
+        
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+        
+        // Добавляем заголовок
+        doc.fontSize(20)
+           .text('Отчет по мониторингу', { align: 'center' })
+           .moveDown();
 
-      doc.fontSize(14)
-         .text(`Пользователь: ${user.username}`)
-         .text(`Метрика: ${metric.name}`)
-         .text(`Дата отчета: ${new Date().toLocaleString()}`)
-         .moveDown();
+        doc.fontSize(14)
+           .text(`Пользователь: ${user.username}`)
+           .text(`Метрика: ${metric.name}`)
+           .text(`Дата отчета: ${new Date().toLocaleString()}`)
+           .moveDown();
 
-      // Создаем таблицу
-      const tableTop = doc.y;
-      const cellPadding = 10;
-      const colWidth = (doc.page.width - 100) / 2;
+        // Создаем таблицу
+        const tableTop = doc.y;
+        const cellPadding = 10;
+        const colWidth = (doc.page.width - 100) / 2;
 
-      // Заголовки таблицы
-      doc.fontSize(12)
-         .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
-         .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
+        // Заголовки таблицы
+        doc.fontSize(12)
+           .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
+           .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
 
-      let rowTop = tableTop + 25;
+        let rowTop = tableTop + 25;
 
-      // Данные таблицы
-      latestValues.forEach((value, i) => {
-        doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
-           .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
-      });
+        // Данные таблицы
+        latestValues.forEach((value, i) => {
+          doc.text(value.value.toString(), 50, rowTop + i * 25, { width: colWidth, align: 'center' })
+             .text(value.createdAt.toLocaleString(), 50 + colWidth, rowTop + i * 25, { width: colWidth, align: 'center' });
+        });
 
-      // Рисуем линии таблицы
-      doc.lineWidth(1);
-      
-      // Горизонтальные линии
-      for (let i = 0; i <= latestValues.length; i++) {
-        doc.moveTo(50, tableTop + i * 25)
-           .lineTo(50 + colWidth * 2, tableTop + i * 25)
+        // Рисуем линии таблицы
+        doc.lineWidth(1);
+        
+        // Горизонтальные линии
+        for (let i = 0; i <= latestValues.length; i++) {
+          doc.moveTo(50, tableTop + i * 25)
+             .lineTo(50 + colWidth * 2, tableTop + i * 25)
+             .stroke();
+        }
+
+        // Вертикальные линии
+        doc.moveTo(50, tableTop)
+           .lineTo(50, tableTop + latestValues.length * 25)
            .stroke();
-      }
+        doc.moveTo(50 + colWidth, tableTop)
+           .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
+           .stroke();
+        doc.moveTo(50 + colWidth * 2, tableTop)
+           .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
+           .stroke();
 
-      // Вертикальные линии
-      doc.moveTo(50, tableTop)
-         .lineTo(50, tableTop + latestValues.length * 25)
-         .stroke();
-      doc.moveTo(50 + colWidth, tableTop)
-         .lineTo(50 + colWidth, tableTop + latestValues.length * 25)
-         .stroke();
-      doc.moveTo(50 + colWidth * 2, tableTop)
-         .lineTo(50 + colWidth * 2, tableTop + latestValues.length * 25)
-         .stroke();
+        // Добавляем печать
+        doc.moveDown(4)
+           .fontSize(12)
+           .text('Документ сформирован автоматически', { align: 'right' })
+           .text('Мониторинговая система', { align: 'right' })
+           .text(new Date().toLocaleDateString(), { align: 'right' });
 
-      // Добавляем печать
-      doc.moveDown(4)
-         .fontSize(12)
-         .text('Документ сформирован автоматически', { align: 'right' })
-         .text('Мониторинговая система', { align: 'right' })
-         .text(new Date().toLocaleDateString(), { align: 'right' });
-
-      // Завершаем документ
-      doc.end();
-
-      console.log(`[DEBUG] PDF created for metric ${metric.name}, waiting for chunks...`);
-
-      // Собираем все чанки в буфер
-      const pdfBuffer = Buffer.concat(chunks);
-      console.log(`[DEBUG] PDF buffer created, size: ${pdfBuffer.length} bytes`);
-
-      // Проверяем настройки SMTP
-      console.log('[DEBUG] SMTP Settings:', {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        secure: Number(process.env.SMTP_PORT) === 465,
-        user: process.env.SMTP_USER ? 'Set' : 'Not set',
-        from: process.env.FROM_EMAIL ? 'Set' : 'Not set'
+        // Завершаем документ
+        doc.end();
       });
 
-      // Отправляем email с PDF
+      console.log(`[DEBUG] Waiting for PDF generation to complete for metric ${metric.name}...`);
+      
       try {
-        console.log(`[DEBUG] Attempting to send email to ${user.email}`);
+        // Дожидаемся завершения генерации PDF
+        const pdfBuffer = await pdfPromise;
+        console.log(`[DEBUG] PDF buffer created, size: ${pdfBuffer.length} bytes`);
+
+        // Проверяем настройки SMTP
+        console.log('[DEBUG] SMTP Settings:', {
+          host: process.env.SMTP_HOST,
+          port: process.env.SMTP_PORT,
+          secure: Number(process.env.SMTP_PORT) === 465,
+          user: process.env.SMTP_USER ? 'Set' : 'Not set',
+          from: process.env.FROM_EMAIL ? 'Set' : 'Not set'
+        });
+
+        // Отправляем email с PDF
         await transporter.sendMail({
           from: process.env.FROM_EMAIL,
           to: user.email,
