@@ -17,7 +17,9 @@ RUN npm install
 COPY . .
 
 # Устанавливаем PM2 для продакшен‑запуска
-RUN npm install -g pm2
+RUN npm install -g pm2 \
+      ttf-dejavu \
+      fontconfig
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     chown -R appuser:appgroup /app
