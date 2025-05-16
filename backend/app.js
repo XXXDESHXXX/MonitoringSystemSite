@@ -158,8 +158,8 @@ app.use(express.json());
 import { initializePassport, passport } from "./dependencies.js";
 app.use(passport.initialize());
 initializePassport();
-app.use("/auth", authRouter);
-app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);
+app.use("/api/auth", authRouter);
+app.use('/api/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 
 async function fetchMetricValue(metricName, promQuery) {
   try {
@@ -229,7 +229,7 @@ setInterval(async () => {
 })();
 
 // 1) Список всех метрик
-app.get('/metrics', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics', ensureAuthenticated, async (req, res) => {
   try {
     // 1) Убедимся, что базовые метрики есть
     await Promise.all([
@@ -313,7 +313,7 @@ app.get('/metrics', ensureAuthenticated, async (req, res) => {
   }
 });
 // 2) LOAD_AVERAGE (как было)
-app.get('/metrics/load_average', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/load_average', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'LOAD_AVERAGE' },
@@ -335,7 +335,7 @@ app.get('/metrics/load_average', ensureAuthenticated, async (req, res) => {
 });
 
 // 3) NODE_MEMORY_DIRTY_BYTES (новая метрика)
-app.get('/metrics/node_cpu_seconds_total', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_cpu_seconds_total', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_CPU_SECONDS_TOTAL' },
@@ -356,7 +356,7 @@ app.get('/metrics/node_cpu_seconds_total', ensureAuthenticated, async (req, res)
   }
 });
 
-app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_MEMORY_MEMFREE_BYTES' },
@@ -378,7 +378,7 @@ app.get('/metrics/node_memory_memfree_bytes', ensureAuthenticated, async (req, r
 });
 
 // New endpoint for total memory
-app.get('/metrics/node_memory_total_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_memory_total_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_MEMORY_TOTAL_BYTES' },
@@ -400,7 +400,7 @@ app.get('/metrics/node_memory_total_bytes', ensureAuthenticated, async (req, res
 });
 
 // New endpoint for CPU usage percentage
-app.get('/metrics/node_cpu_usage_percent', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_cpu_usage_percent', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_CPU_USAGE_PERCENT' },
@@ -422,7 +422,7 @@ app.get('/metrics/node_cpu_usage_percent', ensureAuthenticated, async (req, res)
 });
 
 // New endpoint for disk read bytes
-app.get('/metrics/node_disk_read_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_disk_read_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_DISK_READ_BYTES' },
@@ -444,7 +444,7 @@ app.get('/metrics/node_disk_read_bytes', ensureAuthenticated, async (req, res) =
 });
 
 // New endpoint for disk write bytes
-app.get('/metrics/node_disk_write_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_disk_write_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_DISK_WRITE_BYTES' },
@@ -466,7 +466,7 @@ app.get('/metrics/node_disk_write_bytes', ensureAuthenticated, async (req, res) 
 });
 
 // New endpoint for memory cached bytes
-app.get('/metrics/node_memory_cached_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_memory_cached_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_MEMORY_CACHED_BYTES' },
@@ -488,7 +488,7 @@ app.get('/metrics/node_memory_cached_bytes', ensureAuthenticated, async (req, re
 });
 
 // New endpoint for disk IO time
-app.get('/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_DISK_IO_TIME' },
@@ -510,7 +510,7 @@ app.get('/metrics/node_disk_io_time', ensureAuthenticated, async (req, res) => {
 });
 
 // New endpoint for system uptime
-app.get('/metrics/node_uptime', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_uptime', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_UPTIME' },
@@ -531,7 +531,7 @@ app.get('/metrics/node_uptime', ensureAuthenticated, async (req, res) => {
   }
 });
 
-app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+app.post('/api/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = req.params.metric_id;
     const userId   = req.user.id;
@@ -563,7 +563,7 @@ app.post('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
 });
 
 // 2) Удаление из избранного
-app.delete('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
+app.delete('/api/metrics/:metric_id/track', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = req.params.metric_id;
     const userId   = req.user.id;
@@ -596,7 +596,7 @@ app.delete('/metrics/:metric_id/track', ensureAuthenticated, async (req, res) =>
 });
 
 // 3) Получение списка всех отслеживаемых метрик пользователя
-app.get('/metrics/tracked', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/tracked', ensureAuthenticated, async (req, res) => {
   try {
     const userId = req.user.id;
 
@@ -620,7 +620,7 @@ app.get('/metrics/tracked', ensureAuthenticated, async (req, res) => {
 });
 
 
-app.get('/tags', ensureAuthenticated, async (req, res) => {
+app.get('/api/tags', ensureAuthenticated, async (req, res) => {
   try {
     const tags = await Tag.findAll({ attributes: ['id', 'name'] });
     res.json(tags);
@@ -631,7 +631,7 @@ app.get('/tags', ensureAuthenticated, async (req, res) => {
 });
 
 
-app.get('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
   const metricId = +req.params.metric_id;
   const days = parseInt(req.query.days, 10);
 
@@ -660,7 +660,7 @@ app.get('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) =>
 
 // POST /metrics/:metric_id/comments
 // — добавить новый комментарий
-app.post('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
+app.post('/api/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = req.params.metric_id;
     const userId   = req.user.id;
@@ -701,7 +701,7 @@ app.post('/metrics/:metric_id/comments', ensureAuthenticated, async (req, res) =
 
 // PUT /comments/:comment_id
 // — редактировать свой комментарий
-app.put('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
+app.put('/api/comments/:comment_id', ensureAuthenticated, async (req, res) => {
   try {
     const commentId = req.params.comment_id;
     const userId    = req.user.id;
@@ -733,7 +733,7 @@ app.put('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
 
 // DELETE /comments/:comment_id
 // — удалить свой комментарий
-app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
+app.delete('/api/comments/:comment_id', ensureAuthenticated, async (req, res) => {
   try {
     const commentId = req.params.comment_id;
     const userId    = req.user.id;
@@ -753,7 +753,7 @@ app.delete('/comments/:comment_id', ensureAuthenticated, async (req, res) => {
 });
 
 // HTTP-эндпоинт для истории значений метрики
-app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
   try {
     const metricId = Number(req.params.metric_id);
     const userId = req.user.id;
@@ -803,7 +803,7 @@ app.get('/metrics/:metric_id/values', ensureAuthenticated, async (req, res) => {
 });
 
 // Endpoint for process count
-app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_process_count', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_PROCESS_COUNT' },
@@ -825,7 +825,7 @@ app.get('/metrics/node_process_count', ensureAuthenticated, async (req, res) => 
 });
 
 // Endpoint for disk usage percent
-app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_DISK_USAGE_PERCENT' },
@@ -847,7 +847,7 @@ app.get('/metrics/node_disk_usage_percent', ensureAuthenticated, async (req, res
 });
 
 // Endpoint for network receive bytes
-app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_NETWORK_RECEIVE_BYTES' },
@@ -869,7 +869,7 @@ app.get('/metrics/node_network_receive_bytes', ensureAuthenticated, async (req, 
 });
 
 // Endpoint for memory usage percent
-app.get('/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, res) => {
+app.get('/api/metrics/node_memory_usage_percent', ensureAuthenticated, async (req, res) => {
   try {
     const [metric] = await Metric.findOrCreate({
       where: { name: 'NODE_MEMORY_USAGE_PERCENT' },
