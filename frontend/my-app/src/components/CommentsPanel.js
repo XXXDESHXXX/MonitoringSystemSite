@@ -49,7 +49,10 @@ export default function CommentsPanel({ metricId }) {
       getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
       {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ text: newText.trim() })
       }
     );
