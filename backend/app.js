@@ -5,7 +5,6 @@ import { createServer } from "http";
 import fetch from "node-fetch";
 import cors from "cors";
 import sequelize from "./db.js";
-import session from 'express-session';
 import authRouter from "./routes/auth.js";
 import { ensureAuthenticated } from "./middleware/auth.js";
 import { ensureAdmin } from './middleware/admin.js';
@@ -147,32 +146,17 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'https://monitoringsite.online',
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cookie"],
-  exposedHeaders: ["Set-Cookie"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  exposedHeaders: ["Authorization"],
   maxAge: 86400,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 app.use(express.json());
 
-// Сессии с куки для кросс-доменных запросов
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: true,
-  saveUninitialized: true,
-  cookie: {
-    sameSite: 'none',
-    secure: true,
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000,
-    domain: 'monitoringsite.online'
-  }
-}));
-
 // Passport
 import { initializePassport, passport } from "./dependencies.js";
 app.use(passport.initialize());
-app.use(passport.session());
 initializePassport();
 app.use("/auth", authRouter);
 app.use('/admin', ensureAuthenticated, ensureAdmin, adminRouter);

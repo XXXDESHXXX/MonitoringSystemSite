@@ -1,32 +1,44 @@
-import express  from 'express';
+import express from 'express';
 import passport from 'passport';
-import User     from '../models/User.js';
-import crypto   from 'crypto';
+import User from '../models/User.js';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import { ensureAuthenticated } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Логин
+// Helper function to generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      email: user.email
+    },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '24h' }
+  );
+};
+
+// Login
 router.post('/login', (req, res, next) => {
   passport.authenticate('local', (err, user, info) => {
     if (err) return next(err);
     if (!user) {
       return res.status(401).json({ error: info?.message || 'Invalid credentials' });
     }
-    req.logIn(user, err => {
-      if (err) return next(err);
-      // возвращаем роль
-      const { id, username, role, email } = user;
-      res.json({ id, username, role, email });
-    });
+    
+    const token = generateToken(user);
+    const { id, username, role, email } = user;
+    res.json({ id, username, role, email, token });
   })(req, res, next);
 });
 
-// Регистрация
+// Register
 router.post('/register', async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    // ... ваша валидация ...
     const exists = await User.findOne({ where: { username } });
     if (exists) return res.status(400).json({ error: 'Username taken' });
 
@@ -34,32 +46,26 @@ router.post('/register', async (req, res, next) => {
     crypto.pbkdf2(password, salt, 310000, 32, 'sha256', async (err, hash) => {
       if (err) return next(err);
       const newUser = await User.create({ username, salt, password: hash });
-      req.logIn(newUser, err => {
-        if (err) return next(err);
-        const { id, username, role, email } = newUser;
-        res.status(201).json({ id, username, role, email });
-      });
+      const token = generateToken(newUser);
+      const { id, username: newUsername, role, email } = newUser;
+      res.status(201).json({ id, username: newUsername, role, email, token });
     });
   } catch (err) {
     next(err);
   }
 });
 
-// Текущий пользователь
+// Current user
 router.get('/me', ensureAuthenticated, (req, res) => {
-  const { id, username, role, email } = req.user;
-  res.json({ id, username, role, email });
+  res.json(req.user);
 });
 
-// Logout
+// Logout - No longer needed with JWT, but keeping for frontend compatibility
 router.post('/logout', (req, res) => {
-  req.logout(err => {
-    if (err) return res.status(500).json({ error: 'Logout failed' });
-    res.json({ message: 'Logout successful' });
-  });
+  res.json({ message: 'Logout successful' });
 });
 
-// Обновление настроек пользователя
+// Update user settings
 router.put('/settings', ensureAuthenticated, async (req, res) => {
   try {
     const { email } = req.body;
@@ -69,14 +75,12 @@ router.put('/settings', ensureAuthenticated, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Обновляем только если email валидный
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         return res.status(400).json({ error: 'Invalid email format' });
       }
 
-      // Проверяем, не занят ли email другим пользователем
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser && existingUser.id !== user.id) {
         return res.status(400).json({ error: 'This email is already in use' });
@@ -87,13 +91,17 @@ router.put('/settings', ensureAuthenticated, async (req, res) => {
 
     await user.save();
 
-    // Возвращаем обновленные данные пользователя
-    res.json({
+    const updatedUser = {
       id: user.id,
       username: user.username,
       email: user.email,
       role: user.role
-    });
+    };
+
+    // Generate new token with updated user data
+    const token = generateToken(updatedUser);
+
+    res.json({ ...updatedUser, token });
   } catch (err) {
     console.error('Error updating user settings:', err);
     if (err.name === 'SequelizeUniqueConstraintError') {

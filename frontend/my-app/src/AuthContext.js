@@ -9,50 +9,60 @@ export const AuthProvider = ({ children }) => {
   const [checking, setChecking] = useState(true);
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // При старте приложения получаем данные о пользователе
+  // Helper function to set auth headers
+  const getAuthHeaders = () => ({
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  });
+
+  // Check token validity on mount
   useEffect(() => {
-    fetch(getAbsoluteURL(API_ENDPOINTS.me), {
-      credentials: 'include'
-    })
-      .then(async res => {
-        if (res.ok) {
-          const data = await res.json();
-          // Ожидаем { id, username, role, email }
-          setUser({
-            id: data.id,
-            username: data.username,
-            role: data.role,
-            email: data.email
-          });
-          setIsAuthenticated(true);
-        } else {
+    if (token) {
+      fetch(getAbsoluteURL(API_ENDPOINTS.me), {
+        headers: getAuthHeaders()
+      })
+        .then(async res => {
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data);
+            setIsAuthenticated(true);
+          } else {
+            // Token is invalid
+            localStorage.removeItem('token');
+            setToken(null);
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('token');
+          setToken(null);
           setUser(null);
           setIsAuthenticated(false);
-        }
-      })
-      .catch(() => {
-        setUser(null);
-        setIsAuthenticated(false);
-      })
-      .finally(() => setChecking(false));
-  }, []);
+        })
+        .finally(() => setChecking(false));
+    } else {
+      setChecking(false);
+    }
+  }, [token]);
 
   const login = async (username, password) => {
     const res = await fetch(getAbsoluteURL(API_ENDPOINTS.login), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ username, password })
     });
 
-    // пытаемся прочитать JSON с ошибкой или данными
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Login failed');
     }
 
-    // Успешно: сохраняем пользователя
+    // Save token and user data
+    localStorage.setItem('token', data.token);
+    setToken(data.token);
     setUser({
       id: data.id,
       username: data.username,
@@ -63,19 +73,31 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    fetch(getAbsoluteURL(API_ENDPOINTS.logout), {
-      method: 'POST',
-      credentials: 'include'
-    }).finally(() => {
-      setUser(null);
-      setIsAuthenticated(false);
-    });
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
   };
 
-  if (checking) return null; // или спиннер
+  const updateUser = (newUserData) => {
+    setUser(newUserData);
+    if (newUserData.token) {
+      localStorage.setItem('token', newUserData.token);
+      setToken(newUserData.token);
+    }
+  };
+
+  if (checking) return null;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout, setUser }}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      user, 
+      login, 
+      logout, 
+      setUser: updateUser,
+      getAuthHeaders 
+    }}>
       {children}
     </AuthContext.Provider>
   );
