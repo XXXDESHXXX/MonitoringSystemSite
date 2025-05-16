@@ -5,7 +5,7 @@ import { io }                                from 'socket.io-client';
 import { getAbsoluteURL }                    from '../utils/utils';
 import { API_ENDPOINTS }                     from '../constants';
 import './ValueHistoryPanel.css';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../AuthContext';
 
 const INTERVALS = [
   { label: 'Последний час',     value: 'hour' },
