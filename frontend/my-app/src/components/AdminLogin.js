@@ -1,22 +1,22 @@
 // src/components/AdminLogin.js
 import React, { useState, useContext } from 'react';
-import { useNavigate }           from 'react-router-dom';
-import { getAbsoluteURL }        from '../utils/utils';
-import { AuthContext }   from '../AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
+import { AuthContext } from '../AuthContext';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const { setUser, setIsAuthenticated } = useContext(AuthContext);
+  const [error, setError] = useState('');
+  const { setUser, setIsAuthenticated, getAuthHeaders } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
-    const res = await fetch(getAbsoluteURL('/auth/login'), {
+    const res = await fetch(getAbsoluteURL(API_ENDPOINTS.login), {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
@@ -24,8 +24,10 @@ export default function AdminLogin() {
       setError('Неверные учётные данные');
       return;
     }
-    const me = await fetch(getAbsoluteURL('/auth/me'), { credentials: 'include' })
-      .then(r => r.json());
+    const data = await res.json();
+    const me = await fetch(getAbsoluteURL(API_ENDPOINTS.me), { 
+      headers: getAuthHeaders()
+    }).then(r => r.json());
     if (me.role !== 'admin') {
       setError('У вас нет прав администратора');
       return;

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAbsoluteURL }    from '../utils/utils';
 import { API_ENDPOINTS }     from '../constants';
+import { useAuth }            from '../AuthContext';
 import RequestIndicator      from './RequestIndicator';
 import StarToggle            from './StarToggle';
 import useMetricTracking     from '../hooks/useMetricTracking';
@@ -11,6 +12,7 @@ import '../index.css';
 export default function NodeDiskIOTime() {
   const [value, setValue]     = useState(null);
   const [status, setStatus]   = useState(null);
+  const { getAuthHeaders }    = useAuth();
 
   const {
     metricId,
@@ -27,14 +29,14 @@ export default function NodeDiskIOTime() {
       setStatus(null);
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.diskIOTime),
-        { credentials: 'include' }
+        { headers: getAuthHeaders() }
       );
       if (cancelled) return;
       setStatus(res.status);
       if (!res.ok) return;
       const json = await res.json();
       if (typeof json.node_disk_io_time === 'number') {
-        setValue(json.node_disk_io_time.toFixed(2));
+        setValue(json.node_disk_io_time);
       }
     }
 
@@ -44,7 +46,7 @@ export default function NodeDiskIOTime() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) return null;
 

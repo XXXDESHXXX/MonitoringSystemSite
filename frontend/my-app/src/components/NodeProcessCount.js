@@ -11,6 +11,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -40,6 +41,7 @@ export default function NodeProcessCount() {
   });
   const [status, setStatus] = useState(null);
   const [currentValue, setCurrentValue] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -51,56 +53,37 @@ export default function NodeProcessCount() {
   useEffect(() => {
     if (!initialized) return;
     let cancelled = false;
+
     async function fetchData() {
       setStatus(null);
-      console.log('Fetching process count data...');
-      try {
-        const url = getAbsoluteURL(API_ENDPOINTS.processCount);
-        console.log('Request URL:', url);
-        
-        const res = await fetch(url, { credentials: 'include' });
-        if (cancelled) return;
-        
-        setStatus(res.status);
-        if (!res.ok) {
-          console.error('Failed to fetch process count:', res.status);
-          return;
-        }
-        
-        const json = await res.json();
-        console.log('Received data:', json);
-        
-        // Проверяем разные возможные форматы ответа
-        const value = json.value || json.node_process_count || json.process_count;
-        if (typeof value === 'number') {
-          console.log('Setting process count value:', value);
-          setCurrentValue(value);
-          setProcessData(prevData => {
-            const newData = {
-              labels: [...prevData.labels, new Date().toLocaleTimeString()],
-              datasets: [{
-                ...prevData.datasets[0],
-                data: [...prevData.datasets[0].data, value]
-              }]
-            };
-            console.log('Updated chart data:', newData);
-            return newData;
-          });
-        } else {
-          console.warn('Unexpected data format:', json);
-        }
-      } catch (error) {
-        console.error('Error fetching process count:', error);
-        setStatus(500);
+      const url = getAbsoluteURL(API_ENDPOINTS.processCount);
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (cancelled) return;
+      setStatus(res.status);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (typeof json.node_process_count === 'number') {
+        setCurrentValue(json.node_process_count);
+        setProcessData(prevData => {
+          const newData = {
+            labels: [...prevData.labels, new Date().toLocaleTimeString()],
+            datasets: [{
+              ...prevData.datasets[0],
+              data: [...prevData.datasets[0].data, json.node_process_count]
+            }]
+          };
+          return newData;
+        });
       }
     }
+
     fetchData();
     const id = setInterval(fetchData, 1000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) {
     console.log('Component not initialized yet');

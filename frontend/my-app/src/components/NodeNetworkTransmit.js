@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAbsoluteURL }    from '../utils/utils';
 import { API_ENDPOINTS }     from '../constants';
+import { useAuth }           from '../AuthContext';
 import RequestIndicator      from './RequestIndicator';
 import StarToggle            from './StarToggle';
 import useMetricTracking     from '../hooks/useMetricTracking';
@@ -11,6 +12,7 @@ import '../index.css';
 export default function NodeNetworkTransmit() {
   const [value, setValue]     = useState(null);
   const [status, setStatus]   = useState(null);
+  const { getAuthHeaders }    = useAuth();
 
   const {
     metricId,
@@ -26,8 +28,8 @@ export default function NodeNetworkTransmit() {
     async function fetchData() {
       setStatus(null);
       const res = await fetch(
-        getAbsoluteURL(API_ENDPOINTS.nodeNetworkTransmit),
-        { credentials: 'include' }
+        getAbsoluteURL(API_ENDPOINTS.networkTransmit),
+        { headers: getAuthHeaders() }
       );
       if (cancelled) return;
       setStatus(res.status);
@@ -45,7 +47,7 @@ export default function NodeNetworkTransmit() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) return null;
 

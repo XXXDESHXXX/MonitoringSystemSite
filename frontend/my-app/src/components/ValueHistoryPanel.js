@@ -5,7 +5,7 @@ import { io }                                from 'socket.io-client';
 import { getAbsoluteURL }                    from '../utils/utils';
 import { API_ENDPOINTS }                     from '../constants';
 import './ValueHistoryPanel.css';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const INTERVALS = [
   { label: 'Последний час',     value: 'hour' },
@@ -20,6 +20,9 @@ export default function ValueHistoryPanel({ metricId }) {
   const [sortBy,   setSortBy]   = useState('date');
   const [order,    setOrder]    = useState('asc');
   const socketRef = useRef(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { getAuthHeaders } = useAuth();
 
   // 1) Подключаемся к бекенд‑WebSocket один раз
@@ -60,25 +63,12 @@ export default function ValueHistoryPanel({ metricId }) {
     // initial HTTP‑запрос
     const { from, to } = computeRange();
     const params = new URLSearchParams({ from, to, sort_by: sortBy, order });
-    async function fetchValues() {
-      try {
-        setLoading(true);
-        const res = await fetch(
-          getAbsoluteURL(API_ENDPOINTS.metricValues(metricId)),
-          { headers: getAuthHeaders() }
-        );
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        setData(data);
-      } catch (err) {
-        console.error('Error fetching metric values:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchValues();
+    fetch(`${getAbsoluteURL(API_ENDPOINTS.metricValues(metricId))}?${params}`, {
+      credentials: 'include'
+    })
+      .then(res => res.ok ? res.json() : [])
+      .then(arr => setData(Array.isArray(arr) ? arr : []))
+      .catch(() => setData([]));
 
     // WebSocket‑подписка
     socketRef.current.emit('subscribe', { metricId });
@@ -99,7 +89,28 @@ export default function ValueHistoryPanel({ metricId }) {
       socketRef.current.emit('unsubscribe', { metricId });
       socketRef.current.off('newValue', handler);
     };
-  }, [open, metricId, interval, sortBy, order, getAuthHeaders]);
+  }, [open, metricId, interval, sortBy, order]);
+
+  useEffect(() => {
+    async function fetchHistory() {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(
+          getAbsoluteURL(API_ENDPOINTS.metricHistory(metricId)),
+          { headers: getAuthHeaders() }
+        );
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const data = await res.json();
+        setHistory(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchHistory();
+  }, [metricId, getAuthHeaders]);
 
   // Вычисление временного окна
   const computeRange = () => {
@@ -109,10 +120,6 @@ export default function ValueHistoryPanel({ metricId }) {
     if (interval === 'week') from.setDate(now.getDate() - 7);
     return { from: from.toISOString(), to: now.toISOString() };
   };
-
-  if (loading) return <div className="loading">Loading...</div>;
-  if (error) return <div className="error">Error: {error}</div>;
-  if (!data.length) return <div className="no-data">No data available</div>;
 
   return (
     <div className="history-panel">
@@ -147,16 +154,19 @@ export default function ValueHistoryPanel({ metricId }) {
               </select>
             </div>
             <ul className="history-list">
-              {data.map((item, idx) => (
-                <li key={idx}>
-                  <span className="hist-date">
-                    {new Date(item.date).toLocaleString()}
-                  </span>
-                  <span className="hist-value">
-                    {item.value}
-                  </span>
-                </li>
-              ))}
+              {data.length === 0
+                ? <li className="no-data">Данных нет</li>
+                : data.map((item, idx) => (
+                    <li key={idx}>
+                      <span className="hist-date">
+                        {new Date(item.date).toLocaleString()}
+                      </span>
+                      <span className="hist-value">
+                        {item.value}
+                      </span>
+                    </li>
+                  ))
+              }
             </ul>
           </motion.div>
         )}

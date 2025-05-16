@@ -6,7 +6,7 @@ import { FaCheck, FaEnvelope } from 'react-icons/fa';
 import './EmailSettings.css';
 
 export default function EmailSettings({ isOpen, setIsOpen }) {
-  const { user, setUser } = useContext(AuthContext);
+  const { user, setUser, getAuthHeaders } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState(null);
   const [isValid, setIsValid] = useState(false);
@@ -43,8 +43,7 @@ export default function EmailSettings({ isOpen, setIsOpen }) {
     try {
       const res = await fetch(getAbsoluteURL(API_ENDPOINTS.userSettings), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: getAuthHeaders(),
         body: JSON.stringify({ email })
       });
 

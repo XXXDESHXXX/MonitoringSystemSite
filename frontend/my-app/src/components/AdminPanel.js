@@ -7,12 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import './AdminPanel.css'
 
 export default function AdminPanel() {
-  const { user } = useAuth()
+  const { user, getAuthHeaders } = useAuth()
 
   const [metrics, setMetrics] = useState([])
   const [allTags, setAllTags] = useState([])
   const [filteredTags, setFilteredTags] = useState([])
   const [users, setUsers]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // формы
   const [newTagName, setNewTagName]   = useState('')
@@ -23,32 +25,45 @@ export default function AdminPanel() {
   const [searchUser, setSearchUser]     = useState('')
   const [searchMetric, setSearchMetric] = useState('')
 
-  // загрузка метрик
+  // Загрузка данных при монтировании
   useEffect(() => {
-    if (user?.role !== 'admin') return
-    fetch(
-      getAbsoluteURL(`${API_ENDPOINTS.listMetrics}?search=${encodeURIComponent(searchMetric)}`),
-      { credentials: 'include' }
-    )
-      .then(res => res.json())
-      .then(data => setMetrics(data))
-      .catch(() => setMetrics([]))
-  }, [user, searchMetric])
+    async function loadData() {
+      try {
+        setLoading(true)
+        setError(null)
 
-  // инициализация всех тегов
-  useEffect(() => {
-    if (user?.role !== 'admin') return
-    fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        setAllTags(data)
-        setFilteredTags(data)
-      })
-      .catch(() => {
-        setAllTags([])
-        setFilteredTags([])
-      })
-  }, [user])
+        // Загружаем пользователей
+        const usersRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminUsers), { 
+          headers: getAuthHeaders()
+        })
+        if (!usersRes.ok) throw new Error('Failed to load users')
+        const usersData = await usersRes.json()
+        setUsers(usersData)
+
+        // Загружаем теги
+        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), { 
+          headers: getAuthHeaders()
+        })
+        if (!tagsRes.ok) throw new Error('Failed to load tags')
+        const tagsData = await tagsRes.json()
+        setAllTags(tagsData)
+        setFilteredTags(tagsData)
+
+        // Загружаем метрики
+        const metricsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics), { 
+          headers: getAuthHeaders()
+        })
+        if (!metricsRes.ok) throw new Error('Failed to load metrics')
+        const metricsData = await metricsRes.json()
+        setMetrics(metricsData)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [getAuthHeaders])
 
   // фильтрация тегов локально
   useEffect(() => {
@@ -62,25 +77,12 @@ export default function AdminPanel() {
     }
   }, [searchTag, allTags])
 
-  // загрузка пользователей
-  useEffect(() => {
-    if (user?.role !== 'admin') return
-    fetch(
-      getAbsoluteURL(`${API_ENDPOINTS.adminUsers}?search=${encodeURIComponent(searchUser)}`),
-      { credentials: 'include' }
-    )
-      .then(res => res.json())
-      .then(data => setUsers(data))
-      .catch(() => setUsers([]))
-  }, [user, searchUser])
-
   // добавить тег
   const addTag = async () => {
     if (!newTagName.trim()) return
     const res = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ name: newTagName.trim(), color: newTagColor })
     })
     if (res.ok) {
@@ -95,7 +97,7 @@ export default function AdminPanel() {
   const delTag = async id => {
     const res = await fetch(
       getAbsoluteURL(`${API_ENDPOINTS.adminTags}/${id}`),
-      { method: 'DELETE', credentials: 'include' }
+      { method: 'DELETE', headers: getAuthHeaders() }
     )
     if (res.ok) {
       setAllTags(prev => prev.filter(t => t.id !== id))
@@ -107,7 +109,7 @@ export default function AdminPanel() {
   const delUser = async id => {
     const res = await fetch(
       getAbsoluteURL(`${API_ENDPOINTS.adminUsers}/${id}`),
-      { method: 'DELETE', credentials: 'include' }
+      { method: 'DELETE', headers: getAuthHeaders() }
     )
     if (res.ok) setUsers(prev => prev.filter(u => u.id !== id))
   }
@@ -116,7 +118,7 @@ export default function AdminPanel() {
   const toggleMetricTag = async (metricId, tagId, hasTag) => {
     const endpoint = API_ENDPOINTS.adminMetricTags(metricId, tagId)
     const method   = hasTag ? 'DELETE' : 'POST'
-    const res      = await fetch(getAbsoluteURL(endpoint), { method, credentials: 'include' })
+    const res      = await fetch(getAbsoluteURL(endpoint), { method, headers: getAuthHeaders() })
     if (!res.ok) return
     setMetrics(prev =>
       prev.map(m => {
