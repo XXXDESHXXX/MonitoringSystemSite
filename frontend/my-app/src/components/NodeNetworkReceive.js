@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -43,6 +44,7 @@ export default function NodeNetworkReceive() {
   });
   const [status, setStatus] = useState(null);
   const [currentValue, setCurrentValue] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -68,7 +70,7 @@ export default function NodeNetworkReceive() {
         const url = getAbsoluteURL(API_ENDPOINTS.networkReceive);
         console.log('Request URL:', url);
         
-        const res = await fetch(url, { credentials: 'include' });
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) {
           console.log('Request cancelled');
           return;
@@ -114,7 +116,7 @@ export default function NodeNetworkReceive() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) {
     console.log('Component not initialized yet, returning null');

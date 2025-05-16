@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -24,6 +25,7 @@ ChartJS.register(
 export default function NodeMemoryUsagePercent() {
   const [memoryUsage, setMemoryUsage] = useState(null);
   const [status, setStatus] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -37,12 +39,9 @@ export default function NodeMemoryUsagePercent() {
     let cancelled = false;
     async function fetchData() {
       setStatus(null);
-      console.log('Fetching memory usage data...');
       try {
         const url = getAbsoluteURL(API_ENDPOINTS.memoryUsagePercent);
-        console.log('Request URL:', url);
-        
-        const res = await fetch(url, { credentials: 'include' });
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) return;
         
         setStatus(res.status);
@@ -52,15 +51,9 @@ export default function NodeMemoryUsagePercent() {
         }
         
         const json = await res.json();
-        console.log('Received data:', json);
-        
-        // Проверяем разные возможные форматы ответа
         const value = json.value || json.node_memory_usage_percent || json.memory_usage_percent;
         if (typeof value === 'number') {
-          console.log('Setting memory usage value:', value);
           setMemoryUsage(value);
-        } else {
-          console.warn('Unexpected data format:', json);
         }
       } catch (error) {
         console.error('Error fetching memory usage:', error);
@@ -73,12 +66,9 @@ export default function NodeMemoryUsagePercent() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
-  if (!initialized) {
-    console.log('Component not initialized yet');
-    return null;
-  }
+  if (!initialized) return null;
 
   const pieData = {
     labels: ['Использовано', 'Свободно'],

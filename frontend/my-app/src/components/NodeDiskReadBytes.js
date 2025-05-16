@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -26,6 +27,7 @@ export default function NodeDiskReadBytes() {
   const [status, setStatus] = useState(null);
   const [lastValue, setLastValue] = useState(null);
   const [speed, setSpeed] = useState(0);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -41,11 +43,8 @@ export default function NodeDiskReadBytes() {
     async function fetchData() {
       try {
         setStatus(null);
-        console.log('Fetching disk read bytes data...');
         const url = getAbsoluteURL(API_ENDPOINTS.diskReadBytes);
-        console.log('URL:', url);
-        
-        const res = await fetch(url, { credentials: 'include' });
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) return;
         
         setStatus(res.status);
@@ -55,8 +54,6 @@ export default function NodeDiskReadBytes() {
         }
         
         const json = await res.json();
-        console.log('Received data:', json);
-        
         if (typeof json.node_disk_read_bytes === 'number') {
           setLastValue(value);
           setValue(json.node_disk_read_bytes);
@@ -76,12 +73,9 @@ export default function NodeDiskReadBytes() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized, value]);
+  }, [initialized, value, getAuthHeaders]);
 
-  if (!initialized) {
-    console.log('Component not initialized yet');
-    return null;
-  }
+  if (!initialized) return null;
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 B';

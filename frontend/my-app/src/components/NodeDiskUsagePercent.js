@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -24,6 +25,7 @@ ChartJS.register(
 export default function NodeDiskUsagePercent() {
   const [diskUsage, setDiskUsage] = useState(null);
   const [status, setStatus] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -37,12 +39,9 @@ export default function NodeDiskUsagePercent() {
     let cancelled = false;
     async function fetchData() {
       setStatus(null);
-      console.log('Fetching disk usage data...');
       try {
         const url = getAbsoluteURL(API_ENDPOINTS.diskUsagePercent);
-        console.log('Request URL:', url);
-        
-        const res = await fetch(url, { credentials: 'include' });
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) return;
         
         setStatus(res.status);
@@ -52,15 +51,9 @@ export default function NodeDiskUsagePercent() {
         }
         
         const json = await res.json();
-        console.log('Received data:', json);
-        
-        // Проверяем разные возможные форматы ответа
         const value = json.value || json.node_disk_usage_percent || json.disk_usage_percent;
         if (typeof value === 'number') {
-          console.log('Setting disk usage value:', value);
           setDiskUsage(value);
-        } else {
-          console.warn('Unexpected data format:', json);
         }
       } catch (error) {
         console.error('Error fetching disk usage:', error);
@@ -73,12 +66,9 @@ export default function NodeDiskUsagePercent() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
-  if (!initialized) {
-    console.log('Component not initialized yet');
-    return null;
-  }
+  if (!initialized) return null;
 
   const pieData = {
     labels: ['Использовано', 'Свободно'],

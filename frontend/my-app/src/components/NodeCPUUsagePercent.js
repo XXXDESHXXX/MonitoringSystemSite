@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -24,6 +25,7 @@ ChartJS.register(
 export default function NodeCPUUsagePercent() {
   const [value, setValue] = useState(null);
   const [status, setStatus] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -40,7 +42,7 @@ export default function NodeCPUUsagePercent() {
       setStatus(null);
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.cpuUsagePercent),
-        { credentials: 'include' }
+        { headers: getAuthHeaders() }
       );
       if (cancelled) return;
       setStatus(res.status);
@@ -57,7 +59,7 @@ export default function NodeCPUUsagePercent() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) return null;
 

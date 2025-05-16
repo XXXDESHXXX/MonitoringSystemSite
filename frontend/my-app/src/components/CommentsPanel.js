@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaEdit, FaTrash, FaCheck, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
-import { AuthContext } from '../AuthContext';
+import { useAuth } from '../AuthContext';
 import './CommentsPanel.css';
 
 const FILTER_OPTIONS = [
@@ -20,78 +20,115 @@ const SORT_OPTIONS = [
 ];
 
 export default function CommentsPanel({ metricId }) {
-  const { user } = useContext(AuthContext);
+  const { getAuthHeaders, user } = useAuth();
   const [comments, setComments] = useState([]);
-  const [newText, setNewText] = useState('');
+  const [newComment, setNewComment] = useState('');
   const [filterDays, setFilterDays] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const params = filterDays ? `?days=${filterDays}` : '';
-    fetch(getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId) + params), {
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(data => {
+    async function fetchComments() {
+      try {
+        setLoading(true);
+        const res = await fetch(
+          getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
+          { headers: getAuthHeaders() }
+        );
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const data = await res.json();
         const sorted = [...data].sort((a, b) => {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
           return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
         });
         setComments(sorted);
-      })
-      .catch(console.error);
-  }, [metricId, filterDays, sortOrder]);
-
-  const addComment = async () => {
-    if (!newText.trim()) return;
-    const res = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: newText.trim() })
+      } catch (err) {
+        console.error('Error fetching comments:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    );
-    if (res.ok) {
-      const created = await res.json();
-      setComments(prev => [{
-        ...created,
-        user: user.username,
-        userId: user.id
-      }, ...prev]);
-      setNewText('');
     }
-  };
 
-  const saveComment = async (id, text) => {
-    const res = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
-      {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim() })
-      }
-    );
-    if (res.ok) {
-      const updated = await res.json();
-      setComments(prev =>
-        prev.map(c => c.id === id ? { ...c, text: updated.text, updatedAt: updated.updatedAt } : c)
+    if (metricId) {
+      fetchComments();
+    }
+  }, [metricId, getAuthHeaders, sortOrder]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
+        {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text: newComment.trim() })
+        }
       );
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const comment = await res.json();
+      setComments(prev => [...prev, comment]);
+      setNewComment('');
+    } catch (err) {
+      console.error('Error posting comment:', err);
+      setError(err.message);
     }
   };
 
-  const deleteComment = async (id) => {
-    const res = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
-      { method: 'DELETE', credentials: 'include' }
-    );
-    if (res.ok) {
-      setComments(prev => prev.filter(c => c.id !== id));
+  const handleEdit = async (commentId, newText) => {
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.updateComment(commentId)),
+        {
+          method: 'PUT',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text: newText })
+        }
+      );
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const updatedComment = await res.json();
+      setComments(prev =>
+        prev.map(c => (c.id === commentId ? { ...c, ...updatedComment } : c))
+      );
+    } catch (err) {
+      console.error('Error updating comment:', err);
+      setError(err.message);
     }
   };
+
+  const handleDelete = async (commentId) => {
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.updateComment(commentId)),
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        }
+      );
+
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      setError(err.message);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading comments...</div>;
+  if (error) return <div className="error">Error: {error}</div>;
 
   return (
     <div className="comments-panel">
@@ -135,23 +172,25 @@ export default function CommentsPanel({ metricId }) {
               key={c.id}
               comment={c}
               isOwn={user && c.userId === user.id}
-              onSave={saveComment}
-              onDelete={deleteComment}
+              onSave={handleEdit}
+              onDelete={handleDelete}
             />
           ))}
         </AnimatePresence>
       </div>
 
       <div className="comment-add">
-        <textarea
-          rows={2}
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
-          placeholder="Написать комментарий..."
-        />
-        <button onClick={addComment} disabled={!newText.trim()}>
-          Отправить
-        </button>
+        <form onSubmit={handleSubmit}>
+          <textarea
+            rows={2}
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+            placeholder="Написать комментарий..."
+          />
+          <button type="submit" disabled={!newComment.trim()}>
+            Отправить
+          </button>
+        </form>
       </div>
     </div>
   );
