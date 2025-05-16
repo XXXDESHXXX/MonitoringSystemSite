@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -11,6 +12,7 @@ import '../index.css';
 export default function NodeMemoryTotalBytes() {
   const [totalMemory, setTotalMemory] = useState(null);
   const [status, setStatus] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -31,7 +33,7 @@ export default function NodeMemoryTotalBytes() {
         const url = getAbsoluteURL(API_ENDPOINTS.memTotalBytes);
         console.log('Request URL:', url);
         
-        const response = await fetch(url, { credentials: 'include' });
+        const response = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) return;
         
         if (!response.ok) {
@@ -62,7 +64,7 @@ export default function NodeMemoryTotalBytes() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) {
     console.log('Component not initialized yet');

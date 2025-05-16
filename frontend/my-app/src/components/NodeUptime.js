@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAbsoluteURL }    from '../utils/utils';
 import { API_ENDPOINTS }     from '../constants';
+import { useAuth }            from '../AuthContext';
 import RequestIndicator      from './RequestIndicator';
 import StarToggle            from './StarToggle';
 import useMetricTracking     from '../hooks/useMetricTracking';
@@ -18,6 +19,7 @@ export default function NodeUptime() {
     seconds: 0,
     totalSeconds: 0
   });
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -34,7 +36,7 @@ export default function NodeUptime() {
       setStatus(null);
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.uptime),
-        { credentials: 'include' }
+        { headers: getAuthHeaders() }
       );
       if (cancelled) return;
       setStatus(res.status);
@@ -65,7 +67,7 @@ export default function NodeUptime() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) return null;
 

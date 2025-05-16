@@ -1,14 +1,16 @@
 // src/hooks/useMetricTracking.js
 
 import { useState, useEffect, useCallback } from 'react';
-import { getAbsoluteURL }                  from '../utils/utils';
-import { API_ENDPOINTS }                   from '../constants';
+import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 
 export default function useMetricTracking(metricName) {
+  const { getAuthHeaders } = useAuth();
   // ID метрики в БД
-  const [metricId, setMetricId]     = useState(null);
+  const [metricId, setMetricId] = useState(null);
   // находится ли она сейчас в избранном
-  const [isTracked, setIsTracked]   = useState(false);
+  const [isTracked, setIsTracked] = useState(false);
   // признак того, что init-запросы завершились
   const [initialized, setInitialized] = useState(false);
 
@@ -17,8 +19,12 @@ export default function useMetricTracking(metricName) {
       try {
         // параллельно получаем все метрики и список отслеживаемых ID
         const [allRes, trackedRes] = await Promise.all([
-          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics),   { credentials: 'include' }),
-          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics),{ credentials: 'include' })
+          fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics), { 
+            headers: getAuthHeaders()
+          }),
+          fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { 
+            headers: getAuthHeaders()
+          })
         ]);
         if (!allRes.ok || !trackedRes.ok) {
           console.error('Failed to fetch metrics or tracked metrics');
@@ -51,7 +57,7 @@ export default function useMetricTracking(metricName) {
     }
 
     init();
-  }, [metricName]);
+  }, [metricName, getAuthHeaders]);
 
   const toggleTracking = useCallback(async () => {
     if (!metricId) return;
@@ -59,7 +65,10 @@ export default function useMetricTracking(metricName) {
     try {
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)),
-        { method, credentials: 'include' }
+        { 
+          method, 
+          headers: getAuthHeaders()
+        }
       );
       if (res.ok) {
         setIsTracked(prev => !prev);
@@ -69,7 +78,7 @@ export default function useMetricTracking(metricName) {
     } catch (err) {
       console.error('toggleTracking error:', err);
     }
-  }, [isTracked, metricId]);
+  }, [isTracked, metricId, getAuthHeaders]);
 
   return { metricId, isTracked, toggleTracking, initialized };
 }

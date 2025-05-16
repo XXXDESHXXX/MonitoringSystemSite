@@ -1,33 +1,39 @@
 // src/components/MetricsList.js
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate }      from 'react-router-dom';
-import { getAbsoluteURL }   from '../utils/utils';
-import { API_ENDPOINTS }    from '../constants';
+import { useNavigate } from 'react-router-dom';
+import { getAbsoluteURL } from '../utils/utils';
+import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import './MetricsList.css';
 
 const METRICS_PER_PAGE = 9;
 
 export default function MetricsList() {
-  const [metrics, setMetrics]               = useState([]);
-  const [allTags, setAllTags]               = useState([]);
+  const [metrics, setMetrics] = useState([]);
+  const [allTags, setAllTags] = useState([]);
   const [selectedTagIds, setSelectedTagIds] = useState(new Set());
-  const [searchQuery, setSearchQuery]       = useState('');
-  const [currentPage, setCurrentPage]       = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [trackedMetrics, setTrackedMetrics] = useState(new Set());
   const navigate = useNavigate();
+  const { getAuthHeaders } = useAuth();
 
   // 1) Загрузка всех тегов и отслеживаемых метрик
   useEffect(() => {
     async function loadInitial() {
       try {
         // Загружаем теги
-        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.tags), { credentials: 'include' });
+        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.tags), { 
+          headers: getAuthHeaders()
+        });
         const tags = await tagsRes.json();
         setAllTags(Array.isArray(tags) ? tags : []);
 
         // Загружаем отслеживаемые метрики
-        const trackedRes = await fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { credentials: 'include' });
+        const trackedRes = await fetch(getAbsoluteURL(API_ENDPOINTS.trackedMetrics), { 
+          headers: getAuthHeaders()
+        });
         const tracked = await trackedRes.json();
         setTrackedMetrics(new Set(tracked.map(m => m.id)));
       } catch (err) {
@@ -35,15 +41,17 @@ export default function MetricsList() {
       }
     }
     loadInitial();
-  }, []);
+  }, [getAuthHeaders]);
 
   // 2) Каждый раз при изменении searchQuery или выбранных тегов запрашиваем отфильтрованный список
   useEffect(() => {
     const params = new URLSearchParams();
-    if (searchQuery.trim())   params.append('search', searchQuery.trim());
-    if (selectedTagIds.size)  params.append('tags', [...selectedTagIds].join(','));
+    if (searchQuery.trim()) params.append('search', searchQuery.trim());
+    if (selectedTagIds.size) params.append('tags', [...selectedTagIds].join(','));
 
-    fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { credentials: 'include' })
+    fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { 
+      headers: getAuthHeaders()
+    })
       .then(res => {
         if (!res.ok) throw new Error(`Status ${res.status}`);
         return res.json();
@@ -55,7 +63,7 @@ export default function MetricsList() {
         console.error('Error fetching metrics:', err);
         setMetrics([]);
       });
-  }, [searchQuery, selectedTagIds]);
+  }, [searchQuery, selectedTagIds, getAuthHeaders]);
 
   // Функция для переключения отслеживания метрики
   const toggleTracking = async (metricId, e) => {
@@ -69,7 +77,7 @@ export default function MetricsList() {
         getAbsoluteURL(API_ENDPOINTS.trackMetric(metricId)), 
         { 
           method,
-          credentials: 'include'
+          headers: getAuthHeaders()
         }
       );
 

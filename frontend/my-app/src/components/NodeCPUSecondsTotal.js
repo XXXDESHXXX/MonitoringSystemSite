@@ -8,6 +8,7 @@ import {
 } from 'chart.js';
 import { getAbsoluteURL } from '../utils/utils';
 import { API_ENDPOINTS } from '../constants';
+import { useAuth } from '../AuthContext';
 import RequestIndicator from './RequestIndicator';
 import StarToggle from './StarToggle';
 import useMetricTracking from '../hooks/useMetricTracking';
@@ -25,6 +26,7 @@ export default function NodeCPUSecondsTotal() {
   const [value, setValue] = useState(null);
   const [status, setStatus] = useState(null);
   const [lastValue, setLastValue] = useState(null);
+  const { getAuthHeaders } = useAuth();
 
   const {
     metricId,
@@ -44,7 +46,7 @@ export default function NodeCPUSecondsTotal() {
         const url = getAbsoluteURL(API_ENDPOINTS.cpuSecondsTotal);
         console.log('URL:', url);
         
-        const res = await fetch(url, { credentials: 'include' });
+        const res = await fetch(url, { headers: getAuthHeaders() });
         if (cancelled) return;
         
         setStatus(res.status);
@@ -72,7 +74,7 @@ export default function NodeCPUSecondsTotal() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized, value]);
+  }, [initialized, value, getAuthHeaders]);
 
   if (!initialized) {
     console.log('Component not initialized yet');

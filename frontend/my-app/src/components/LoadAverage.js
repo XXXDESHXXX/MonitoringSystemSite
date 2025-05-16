@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAbsoluteURL }    from '../utils/utils';
 import { API_ENDPOINTS }     from '../constants';
+import { useAuth }            from '../AuthContext';
 import RequestIndicator      from './RequestIndicator';
 import StarToggle            from './StarToggle';
 import useMetricTracking     from '../hooks/useMetricTracking';
@@ -12,6 +13,7 @@ import '../index.css';
 export default function LoadAverage() {
   const [load, setLoad]     = useState(null);
   const [status, setStatus] = useState(null);
+  const { getAuthHeaders }  = useAuth();
 
   const {
     metricId,
@@ -28,7 +30,7 @@ export default function LoadAverage() {
       console.log('Fetching load average data...');
       const res = await fetch(
         getAbsoluteURL(API_ENDPOINTS.loadAverage),
-        { credentials: 'include' }
+        { headers: getAuthHeaders() }
       );
       if (cancelled) return;
       setStatus(res.status);
@@ -48,7 +50,7 @@ export default function LoadAverage() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [initialized]);
+  }, [initialized, getAuthHeaders]);
 
   if (!initialized) {
     console.log('Component not initialized yet');
