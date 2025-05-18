@@ -64,7 +64,6 @@ export default function ValueHistoryPanel({ metricId }) {
     const { from, to } = computeRange();
     const params = new URLSearchParams({ from, to, sort_by: sortBy, order });
     fetch(`${getAbsoluteURL(API_ENDPOINTS.metricValues(metricId))}?${params}`, {
-      credentials: 'include',
       headers: getAuthHeaders()
     })
       .then(res => res.ok ? res.json() : [])
@@ -98,7 +97,7 @@ export default function ValueHistoryPanel({ metricId }) {
         setLoading(true);
         setError(null);
         const res = await fetch(
-          getAbsoluteURL(API_ENDPOINTS.metricValues(metricId)),
+          getAbsoluteURL(API_ENDPOINTS.metricHistory(metricId)),
           { headers: getAuthHeaders() }
         );
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
