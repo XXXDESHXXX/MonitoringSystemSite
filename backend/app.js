@@ -13,6 +13,7 @@ import db from './models/index.js';
 import nodemailer from 'nodemailer';
 import { initializeAdminAccounts } from './init-admin-accounts.js';
 import PDFDocument from 'pdfkit';
+import { Server } from 'socket.io';
 
 const FONT_PATH = '/usr/share/fonts/dejavu/DejaVuSans.ttf';
 
@@ -142,6 +143,46 @@ import { Op } from 'sequelize';
 const app = express();
 const httpServer = createServer(app);
 
+// Настройка Socket.IO
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'https://monitoringsite.online',
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  path: '/socket.io',
+  transports: ['websocket', 'polling']
+});
+
+// Обработка WebSocket соединений
+io.on('connection', (socket) => {
+  console.log('Client connected');
+
+  socket.on('subscribe', ({ metricId }) => {
+    console.log(`Client subscribed to metric ${metricId}`);
+    socket.join(`metric-${metricId}`);
+  });
+
+  socket.on('unsubscribe', ({ metricId }) => {
+    console.log(`Client unsubscribed from metric ${metricId}`);
+    socket.leave(`metric-${metricId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
+
+// Функция для отправки обновлений метрик через WebSocket
+async function broadcastMetricUpdate(metricId, value) {
+  io.to(`metric-${metricId}`).emit('newValue', {
+    metricId,
+    value,
+    date: new Date()
+  });
+}
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'https://monitoringsite.online',
   credentials: true,
@@ -161,16 +202,15 @@ initializePassport();
 app.use("/api/auth", authRouter);
 app.use('/api/admin', ensureAuthenticated, ensureAdmin, adminRouter);
 
+// Модифицируем функцию fetchMetricValue для отправки обновлений
 async function fetchMetricValue(metricName, promQuery) {
   try {
     const [metric] = await Metric.findOrCreate({ where: { name: metricName } });
     
-    // Проверяем, есть ли хоть один пользователь, отслеживающий эту метрику
     const trackables = await Trackable.findAll({
       where: { metric_id: metric.id }
     });
 
-    // Если никто не отслеживает метрику, не делаем запрос к Prometheus
     if (trackables.length === 0) {
       return null;
     }
@@ -181,11 +221,13 @@ async function fetchMetricValue(metricName, promQuery) {
     if (data.status === "success" && data.data.result.length) {
       const val = parseFloat(data.data.result[0].value[1]);
       
-      // Сохраняем значение, так как метрика отслеживается
       await MetricValue.create({ 
-        value: val.toString(), // Убедимся, что значение сохраняется как строка
+        value: val.toString(),
         metric_id: metric.id 
       });
+
+      // Отправляем обновление через WebSocket
+      broadcastMetricUpdate(metric.id, val);
       
       return val;
     }

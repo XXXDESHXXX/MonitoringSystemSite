@@ -33,12 +33,14 @@ export default function ValueHistoryPanel({ metricId }) {
 
     socketRef.current = io(socketUrl, {
       path: '/socket.io',
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      autoConnect: true
+      autoConnect: true,
+      forceNew: true,
+      timeout: 10000
     });
 
     socketRef.current.on('connect', () => {
