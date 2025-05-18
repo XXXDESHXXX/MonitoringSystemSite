@@ -19,7 +19,7 @@ export default function NodeMemoryFreeBytes() {
     isTracked,
     toggleTracking,
     initialized
-  } = useMetricTracking('NODE_MEMORY_FREE_BYTES');
+  } = useMetricTracking('NODE_MEMORY_MEMFREE_BYTES');
 
   useEffect(() => {
     if (!initialized) return;

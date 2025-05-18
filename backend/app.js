@@ -50,7 +50,12 @@ async function sendHourlyNotifications() {
 
   for (let { user, metrics } of Object.values(byUser)) {
     console.log(`[DEBUG] Generating report for ${user.username}`);
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 50,
+      bufferPages: true
+    });
+    
     doc.registerFont('DejaVu', FONT_PATH);
     doc.font('DejaVu');
 
@@ -62,56 +67,119 @@ async function sendHourlyNotifications() {
       doc.on('error', reject);
     });
 
-    // шапка
-    doc.fontSize(20).text('Отчет по мониторингу', { align: 'center' }).moveDown();
+    // Шапка отчета
+    doc.fontSize(24)
+       .text('Отчет по мониторингу', { align: 'center' })
+       .moveDown();
+    
     doc.fontSize(14)
        .text(`Пользователь: ${user.username}`)
        .text(`Дата отчета: ${new Date().toLocaleString()}`)
        .moveDown(2);
 
-    // для каждой метрики создаем таблицу
+    // Для каждой метрики создаем таблицу
     for (let { metricName, metricId } of metrics) {
-      doc.fontSize(16).text(metricName, { underline: true }).moveDown(0.5);
+      // Заголовок метрики
+      doc.fontSize(16)
+         .text(metricName.replace(/_/g, ' '), { underline: true })
+         .moveDown(0.5);
+
+      // Получаем значения метрики
       const values = await MetricValue.findAll({
-        where: { metric_id: metricId, createdAt: { [Op.gte]: oneHourAgo } },
-        order: [['createdAt','DESC']],
-        limit: 5
+        where: { 
+          metric_id: metricId, 
+          createdAt: { [Op.gte]: oneHourAgo } 
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 10
       });
 
-      // заголовки
-      const tableTop = doc.y;
-      const colW = 200;
-      doc.fontSize(12)
-         .text('Значение', 50, tableTop, { width: colW, align: 'center' })
-         .text('Время', 50 + colW, tableTop, { width: colW, align: 'center' });
-      let row = tableTop + 25;
-      values.forEach(v => {
-        doc.text(v.value, 50, row, { width: colW, align: 'center' })
-           .text(new Date(v.createdAt).toLocaleString(), 50 + colW, row, { width: colW, align: 'center' });
-        row += 25;
-      });
-      // линии
-      doc.moveTo(50, tableTop).lineTo(50 + colW*2, tableTop).stroke();
-      doc.moveTo(50, row).lineTo(50 + colW*2, row).stroke();
-      doc.moveTo(50, tableTop).lineTo(50, row).stroke();
-      doc.moveTo(50+colW, tableTop).lineTo(50+colW, row).stroke();
-      doc.moveTo(50+colW*2, tableTop).lineTo(50+colW*2, row).stroke();
-      doc.moveDown(2);
+      if (values.length > 0) {
+        // Настройки таблицы
+        const tableTop = doc.y;
+        const colWidth = 200;
+        const rowHeight = 30;
+        const headerHeight = 40;
+
+        // Заголовки таблицы
+        doc.fontSize(12)
+           .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
+           .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
+
+        // Линия под заголовками
+        doc.moveTo(50, tableTop + headerHeight)
+           .lineTo(50 + colWidth * 2, tableTop + headerHeight)
+           .stroke();
+
+        // Данные таблицы
+        let currentY = tableTop + headerHeight;
+        values.forEach((v, index) => {
+          // Форматируем значение в зависимости от типа метрики
+          let displayValue = v.value;
+          if (metricName.includes('MEMORY') && metricName.includes('BYTES')) {
+            displayValue = (parseFloat(v.value) / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+          } else if (metricName.includes('PERCENT')) {
+            displayValue = parseFloat(v.value).toFixed(2) + '%';
+          }
+
+          // Добавляем строку данных
+          doc.fontSize(10)
+             .text(displayValue, 50, currentY, { width: colWidth, align: 'center' })
+             .text(new Date(v.createdAt).toLocaleString(), 50 + colWidth, currentY, { width: colWidth, align: 'center' });
+
+          // Линии между строками
+          doc.moveTo(50, currentY + rowHeight)
+             .lineTo(50 + colWidth * 2, currentY + rowHeight)
+             .stroke();
+
+          currentY += rowHeight;
+        });
+
+        // Вертикальные линии таблицы
+        doc.moveTo(50, tableTop)
+           .lineTo(50, currentY)
+           .stroke();
+        doc.moveTo(50 + colWidth, tableTop)
+           .lineTo(50 + colWidth, currentY)
+           .stroke();
+        doc.moveTo(50 + colWidth * 2, tableTop)
+           .lineTo(50 + colWidth * 2, currentY)
+           .stroke();
+
+        // Добавляем отступ после таблицы
+        doc.moveDown(2);
+      } else {
+        doc.fontSize(10)
+           .text('Нет данных за последний час', { color: 'gray' })
+           .moveDown(2);
+      }
+
+      // Проверяем, не вышли ли за пределы страницы
+      if (doc.y > 700) {
+        doc.addPage();
+      }
     }
 
-    doc.fontSize(10).text('Документ сформирован автоматически', { align: 'right' });
+    // Подпись в конце отчета
+    doc.fontSize(10)
+       .text('Документ сформирован автоматически', { align: 'right' })
+       .text(`Страница ${doc.bufferedPageRange().start + 1} из ${doc.bufferedPageRange().count}`, { align: 'right' });
+
     doc.end();
 
     const pdfBuffer = await pdfPromise;
     console.log(`[DEBUG] PDF ready for ${user.username}`);
 
-    // отправляем одним письмом
+    // Отправляем письмо
     await transporter.sendMail({
       from: process.env.FROM_EMAIL,
       to: user.email,
       subject: `Ежечасной отчет мониторинга для ${user.username}`,
       text: `Здравствуйте, ${user.username}! В приложении вы найдете единый отчет по всем вашим метрикам за последний час.`,
-      attachments: [{ filename: `report_${user.username}_${new Date().toISOString()}.pdf`, content: pdfBuffer }]
+      attachments: [{ 
+        filename: `report_${user.username}_${new Date().toISOString()}.pdf`, 
+        content: pdfBuffer 
+      }]
     });
     console.log(`[MAIL] Sent aggregated report to ${user.email}`);
   }
@@ -297,7 +365,12 @@ app.get('/api/metrics', ensureAuthenticated, async (req, res) => {
     // 3) WHERE по имени (search)
     const where = {};
     if (search && search.trim()) {
-      where.name = { [Op.iLike]: `%${search.trim()}%` };
+      const searchTerms = search.trim().split('_');
+      where.name = {
+        [Op.and]: searchTerms.map(term => ({
+          [Op.iLike]: `%${term}%`
+        }))
+      };
     }
 
     // 4) Подготовка запроса

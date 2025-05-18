@@ -46,7 +46,11 @@ export default function MetricsList() {
   // 2) Каждый раз при изменении searchQuery или выбранных тегов запрашиваем отфильтрованный список
   useEffect(() => {
     const params = new URLSearchParams();
-    if (searchQuery.trim()) params.append('search', searchQuery.trim());
+    if (searchQuery.trim()) {
+      // Преобразуем поисковый запрос: убираем лишние пробелы и приводим к верхнему регистру
+      const searchTerms = searchQuery.trim().toUpperCase().split(/\s+/);
+      params.append('search', searchTerms.join('_'));
+    }
     if (selectedTagIds.size) params.append('tags', [...selectedTagIds].join(','));
 
     fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics) + '?' + params, { 
