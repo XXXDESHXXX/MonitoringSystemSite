@@ -31,7 +31,6 @@ async function sendHourlyNotifications() {
   console.log('[DEBUG] Starting sendHourlyNotifications...');
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  // группируем по пользователям
   const trackables = await Trackable.findAll({
     where: {},
     include: [
@@ -59,13 +58,87 @@ async function sendHourlyNotifications() {
     doc.registerFont('DejaVu', FONT_PATH);
     doc.font('DejaVu');
 
-    // собираем в буфер
     const chunks = [];
     const pdfPromise = new Promise((resolve, reject) => {
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
     });
+
+    // Функция для создания таблицы
+    const createTable = (values, metricName) => {
+      const tableTop = doc.y;
+      const colWidth = 200;
+      const rowHeight = 30;
+      const headerHeight = 40;
+      const tableWidth = colWidth * 2;
+      const tableHeight = headerHeight + (values.length * rowHeight);
+
+      // Проверяем, поместится ли таблица на текущей странице
+      if (tableTop + tableHeight > 700) {
+        doc.addPage();
+        return createTable(values, metricName); // Рекурсивно создаем таблицу на новой странице
+      }
+
+      // Заголовок метрики
+      doc.fontSize(16)
+         .text(metricName.replace(/_/g, ' '), { underline: true })
+         .moveDown(0.5);
+
+      // Верхняя граница таблицы
+      doc.moveTo(50, doc.y)
+         .lineTo(50 + tableWidth, doc.y)
+         .stroke();
+
+      // Заголовки таблицы
+      const headerY = doc.y;
+      doc.fontSize(12)
+         .text('Значение', 50, headerY, { width: colWidth, align: 'center' })
+         .text('Время', 50 + colWidth, headerY, { width: colWidth, align: 'center' });
+
+      // Линия под заголовками
+      doc.moveTo(50, headerY + headerHeight)
+         .lineTo(50 + tableWidth, headerY + headerHeight)
+         .stroke();
+
+      // Данные таблицы
+      let currentY = headerY + headerHeight;
+      values.forEach((v, index) => {
+        // Форматируем значение
+        let displayValue = v.value;
+        if (metricName.includes('MEMORY') && metricName.includes('BYTES')) {
+          displayValue = (parseFloat(v.value) / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        } else if (metricName.includes('PERCENT')) {
+          displayValue = parseFloat(v.value).toFixed(2) + '%';
+        }
+
+        // Добавляем строку данных
+        doc.fontSize(10)
+           .text(displayValue, 50, currentY, { width: colWidth, align: 'center' })
+           .text(new Date(v.createdAt).toLocaleString(), 50 + colWidth, currentY, { width: colWidth, align: 'center' });
+
+        // Горизонтальные линии между строками
+        doc.moveTo(50, currentY + rowHeight)
+           .lineTo(50 + tableWidth, currentY + rowHeight)
+           .stroke();
+
+        currentY += rowHeight;
+      });
+
+      // Вертикальные линии таблицы
+      doc.moveTo(50, headerY)
+         .lineTo(50, currentY)
+         .stroke();
+      doc.moveTo(50 + colWidth, headerY)
+         .lineTo(50 + colWidth, currentY)
+         .stroke();
+      doc.moveTo(50 + tableWidth, headerY)
+         .lineTo(50 + tableWidth, currentY)
+         .stroke();
+
+      // Добавляем отступ после таблицы
+      doc.moveDown(2);
+    };
 
     // Шапка отчета
     doc.fontSize(24)
@@ -79,12 +152,6 @@ async function sendHourlyNotifications() {
 
     // Для каждой метрики создаем таблицу
     for (let { metricName, metricId } of metrics) {
-      // Заголовок метрики
-      doc.fontSize(16)
-         .text(metricName.replace(/_/g, ' '), { underline: true })
-         .moveDown(0.5);
-
-      // Получаем значения метрики
       const values = await MetricValue.findAll({
         where: { 
           metric_id: metricId, 
@@ -95,68 +162,11 @@ async function sendHourlyNotifications() {
       });
 
       if (values.length > 0) {
-        // Настройки таблицы
-        const tableTop = doc.y;
-        const colWidth = 200;
-        const rowHeight = 30;
-        const headerHeight = 40;
-
-        // Заголовки таблицы
-        doc.fontSize(12)
-           .text('Значение', 50, tableTop, { width: colWidth, align: 'center' })
-           .text('Время', 50 + colWidth, tableTop, { width: colWidth, align: 'center' });
-
-        // Линия под заголовками
-        doc.moveTo(50, tableTop + headerHeight)
-           .lineTo(50 + colWidth * 2, tableTop + headerHeight)
-           .stroke();
-
-        // Данные таблицы
-        let currentY = tableTop + headerHeight;
-        values.forEach((v, index) => {
-          // Форматируем значение в зависимости от типа метрики
-          let displayValue = v.value;
-          if (metricName.includes('MEMORY') && metricName.includes('BYTES')) {
-            displayValue = (parseFloat(v.value) / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-          } else if (metricName.includes('PERCENT')) {
-            displayValue = parseFloat(v.value).toFixed(2) + '%';
-          }
-
-          // Добавляем строку данных
-          doc.fontSize(10)
-             .text(displayValue, 50, currentY, { width: colWidth, align: 'center' })
-             .text(new Date(v.createdAt).toLocaleString(), 50 + colWidth, currentY, { width: colWidth, align: 'center' });
-
-          // Линии между строками
-          doc.moveTo(50, currentY + rowHeight)
-             .lineTo(50 + colWidth * 2, currentY + rowHeight)
-             .stroke();
-
-          currentY += rowHeight;
-        });
-
-        // Вертикальные линии таблицы
-        doc.moveTo(50, tableTop)
-           .lineTo(50, currentY)
-           .stroke();
-        doc.moveTo(50 + colWidth, tableTop)
-           .lineTo(50 + colWidth, currentY)
-           .stroke();
-        doc.moveTo(50 + colWidth * 2, tableTop)
-           .lineTo(50 + colWidth * 2, currentY)
-           .stroke();
-
-        // Добавляем отступ после таблицы
-        doc.moveDown(2);
+        createTable(values, metricName);
       } else {
         doc.fontSize(10)
            .text('Нет данных за последний час', { color: 'gray' })
            .moveDown(2);
-      }
-
-      // Проверяем, не вышли ли за пределы страницы
-      if (doc.y > 700) {
-        doc.addPage();
       }
     }
 
@@ -170,7 +180,6 @@ async function sendHourlyNotifications() {
     const pdfBuffer = await pdfPromise;
     console.log(`[DEBUG] PDF ready for ${user.username}`);
 
-    // Отправляем письмо
     await transporter.sendMail({
       from: process.env.FROM_EMAIL,
       to: user.email,
