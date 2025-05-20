@@ -22,9 +22,20 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   email: {
-    type: DataTypes.STRING,
-    validate: { isEmail: true },
-    unique: true
+    type: DataTypes.STRING(254), // RFC 5321 standard maximum length
+    allowNull: true,
+    unique: true,
+    validate: {
+      isEmail: true,
+      len: {
+        args: [3, 254],
+        msg: 'Email must be between 3 and 254 characters'
+      },
+      is: {
+        args: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+        msg: 'Invalid email format'
+      }
+    }
   },
   role: {
     type: DataTypes.ENUM('user','admin'),

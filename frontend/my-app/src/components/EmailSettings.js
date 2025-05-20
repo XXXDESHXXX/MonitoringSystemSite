@@ -21,7 +21,9 @@ export default function EmailSettings({ isOpen, setIsOpen }) {
   }, [isOpen, user]);
 
   const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return false;
+    if (email.length < 3 || email.length > 254) return false;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
   };
 
@@ -36,7 +38,7 @@ export default function EmailSettings({ isOpen, setIsOpen }) {
     setMessage(null);
 
     if (!isValid) {
-      setMessage({ type: 'error', text: 'Пожалуйста, введите корректный email' });
+      setMessage({ type: 'error', text: 'Пожалуйста, введите корректный email (3-254 символов)' });
       return;
     }
 
@@ -76,6 +78,7 @@ export default function EmailSettings({ isOpen, setIsOpen }) {
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="Введите ваш email"
+                maxLength={254}
                 className={isValid ? 'valid' : ''}
               />
               {isValid && <FaCheck className="valid-icon" />}
