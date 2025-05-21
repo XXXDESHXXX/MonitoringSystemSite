@@ -31,7 +31,7 @@ services:
       - app-network
 
   prometheus:
-    image: prom/prometheus:2.35.0
+    image: prom/prometheus:2.45.0
     container_name: course-project-prometheus
     ports:
       - "9090:9090"
@@ -47,7 +47,7 @@ services:
       - app-network
 
   node-exporter:
-    image: prom/node-exporter:v1.9.0
+    image: prom/node-exporter:v1.7.0
     container_name: course-project-node-exporter
     ports:
       - "9100:9100"
