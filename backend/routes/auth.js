@@ -39,6 +39,12 @@ router.post('/login', (req, res, next) => {
 router.post('/register', async (req, res, next) => {
   try {
     const { username, password } = req.body;
+    if (!username || username.length < 1 || username.length > 48) {
+      return res.status(400).json({ error: 'Логин должен быть от 1 до 48 символов' });
+    }
+    if (!password || password.length < 8 || password.length > 32) {
+      return res.status(400).json({ error: 'Пароль должен быть от 8 до 32 символов' });
+    }
     const exists = await User.findOne({ where: { username } });
     if (exists) return res.status(400).json({ error: 'Username taken' });
 

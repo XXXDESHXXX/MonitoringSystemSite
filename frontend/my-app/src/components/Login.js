@@ -18,11 +18,11 @@ export default function Login() {
     setMessage(null);
 
     // Валидация на клиенте
-    if (username.length > 16) {
-      return setMessage({ type: 'error', text: 'Логин не может быть длиннее 16 символов' });
+    if (username.length > 48) {
+      return setMessage({ type: 'error', text: 'Логин не может быть длиннее 48 символов' });
     }
-    if (password.length < 8 || password.length > 64) {
-      return setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 64 символов' });
+    if (password.length < 8 || password.length > 32) {
+      return setMessage({ type: 'error', text: 'Пароль должен быть от 8 до 32 символов' });
     }
 
     try {
@@ -44,7 +44,7 @@ export default function Login() {
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            maxLength={16}
+            maxLength={48}
             required
           />
         </label>
@@ -56,7 +56,7 @@ export default function Login() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             minLength={8}
-            maxLength={64}
+            maxLength={32}
             required
           />
         </label>

@@ -19,6 +19,7 @@ export default function AdminPanel() {
   // формы
   const [newTagName, setNewTagName]   = useState('')
   const [newTagColor, setNewTagColor] = useState('#3498db')
+  const [tagError, setTagError] = useState(null)
 
   // поисковые строки
   const [searchTag, setSearchTag]       = useState('')
@@ -79,7 +80,20 @@ export default function AdminPanel() {
 
   // добавить тег
   const addTag = async () => {
+    setTagError(null)
     if (!newTagName.trim()) return
+    if (newTagName.trim().length > 32) {
+      setTagError('Название тега не может быть длиннее 32 символов')
+      return
+    }
+    if (allTags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase())) {
+      setTagError('Тег с таким названием уже существует')
+      return
+    }
+    if (!newTagColor || newTagColor.length > 56) {
+      setTagError('Цвет должен быть не длиннее 56 символов')
+      return
+    }
     const res = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -163,6 +177,7 @@ export default function AdminPanel() {
               placeholder="Новый тег"
               value={newTagName}
               onChange={e => setNewTagName(e.target.value)}
+              maxLength={32}
             />
             <input
               type="color"
@@ -172,6 +187,7 @@ export default function AdminPanel() {
             />
             <button className="btn-add" onClick={addTag}>Добавить</button>
           </div>
+          {tagError && <div className="admin-error">{tagError}</div>}
           <ul className="admin-list">
             <AnimatePresence>
               {filteredTags.map(t => (

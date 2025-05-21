@@ -7,7 +7,10 @@ const MetricValue = sequelize.define('MetricValue', {
     primaryKey: true,
     autoIncrement: true
   },
-  value: { type: DataTypes.STRING }
+  value: {
+    type: DataTypes.STRING(250),
+    allowNull: false,
+  }
 }, {
   tableName: 'MetricValue',
   timestamps: true

@@ -9,9 +9,15 @@ const User = sequelize.define('User', {
     autoIncrement: true
   },
   username: {
-    type: DataTypes.STRING(16),
+    type: DataTypes.STRING(48),
     allowNull: false,
-    unique: true
+    unique: true,
+    validate: {
+      len: {
+        args: [1, 48],
+        msg: 'Логин должен быть от 1 до 48 символов'
+      }
+    }
   },
   password: {
     type: DataTypes.BLOB,
