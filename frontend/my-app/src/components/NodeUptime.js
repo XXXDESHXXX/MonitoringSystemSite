@@ -81,55 +81,33 @@ export default function NodeUptime() {
     boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
   };
 
-  const clockContainerStyle = {
+  const progressBarContainerStyle = {
+    width: '100%',
+    height: '40px',
+    backgroundColor: '#f0f0f0',
+    borderRadius: '20px',
+    overflow: 'hidden',
     position: 'relative',
-    width: '300px',
-    height: '300px',
-    margin: '0 auto',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '50%',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+    margin: '20px 0'
   };
 
-  const handStyle = (rotation, length, width, color) => ({
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: `${width}px`,
-    height: `${length}px`,
-    backgroundColor: color,
-    transformOrigin: 'bottom center',
-    transform: `translateX(-50%) rotate(${rotation}deg)`,
-    borderRadius: '4px',
-    transition: 'transform 0.5s cubic-bezier(0.4, 2.08, 0.55, 0.44)'
-  });
-
-  const centerPointStyle = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: '12px',
-    height: '12px',
-    backgroundColor: '#333',
-    borderRadius: '50%',
-    transform: 'translate(-50%, -50%)',
-    zIndex: 2
+  const progressBarStyle = {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: '20px',
+    transition: 'width 0.5s ease-in-out',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    textShadow: '0 1px 2px rgba(0,0,0,0.2)'
   };
-
-  const hourMarkStyle = (rotation) => ({
-    position: 'absolute',
-    top: '10px',
-    left: '50%',
-    width: '2px',
-    height: '10px',
-    backgroundColor: '#666',
-    transformOrigin: 'bottom center',
-    transform: `translateX(-50%) rotate(${rotation}deg)`
-  });
 
   const statsContainerStyle = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
+    gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '20px',
     marginTop: '30px',
     padding: '20px',
@@ -148,7 +126,7 @@ export default function NodeUptime() {
   const statValueStyle = {
     fontSize: '24px',
     fontWeight: 'bold',
-    color: '#2196F3',
+    color: '#4CAF50',
     marginBottom: '5px'
   };
 
@@ -157,11 +135,9 @@ export default function NodeUptime() {
     color: '#666'
   };
 
-  const calculateHandRotation = (value, max) => (value / max) * 360;
-
-  const hourMarks = Array.from({ length: 12 }, (_, i) => (
-    <div key={i} style={hourMarkStyle(i * 30)} />
-  ));
+  // Calculate progress percentage (assuming 30 days as max for visualization)
+  const maxUptimeSeconds = 30 * 24 * 3600; // 30 days in seconds
+  const progressPercentage = Math.min((uptimeDetails.totalSeconds / maxUptimeSeconds) * 100, 100);
 
   return (
     <div className="metric-container">
@@ -177,12 +153,15 @@ export default function NodeUptime() {
       </div>
 
       <div style={containerStyle}>
-        <div style={clockContainerStyle}>
-          {hourMarks}
-          <div style={handStyle(calculateHandRotation(uptimeDetails.hours, 24), 80, 4, '#2196F3')} />
-          <div style={handStyle(calculateHandRotation(uptimeDetails.minutes, 60), 100, 3, '#4CAF50')} />
-          <div style={handStyle(calculateHandRotation(uptimeDetails.seconds, 60), 120, 2, '#F44336')} />
-          <div style={centerPointStyle} />
+        <div style={progressBarContainerStyle}>
+          <div 
+            style={{
+              ...progressBarStyle,
+              width: `${progressPercentage}%`
+            }}
+          >
+            {value || '—'}
+          </div>
         </div>
 
         <div style={statsContainerStyle}>
@@ -201,13 +180,6 @@ export default function NodeUptime() {
           <div style={statItemStyle}>
             <div style={statValueStyle}>{uptimeDetails.seconds}</div>
             <div style={statLabelStyle}>Секунд</div>
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '20px', color: '#666' }}>
-          <div style={{ fontSize: '14px', marginBottom: '5px' }}>Общее время работы</div>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2196F3' }}>
-            {value || '—'}
           </div>
         </div>
       </div>

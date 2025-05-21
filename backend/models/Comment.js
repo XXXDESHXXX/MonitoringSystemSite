@@ -9,7 +9,13 @@ const Comment = sequelize.define('Comment', {
   },
   comment: {
     type: DataTypes.TEXT,
-    allowNull: false
+    allowNull: false,
+    validate: {
+      len: {
+        args: [1, 1000],
+        msg: 'Комментарий должен содержать от 1 до 1000 символов'
+      }
+    }
   }
 }, {
   tableName: 'Comments',

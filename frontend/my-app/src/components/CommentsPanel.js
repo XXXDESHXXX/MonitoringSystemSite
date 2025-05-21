@@ -19,12 +19,15 @@ const SORT_OPTIONS = [
   { label: 'Сначала старые', value: 'asc' }
 ];
 
+const MAX_COMMENT_LENGTH = 1000;
+
 export default function CommentsPanel({ metricId }) {
   const { user, getAuthHeaders } = useContext(AuthContext);
   const [comments, setComments] = useState([]);
   const [newText, setNewText] = useState('');
   const [filterDays, setFilterDays] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     const params = filterDays ? `?days=${filterDays}` : '';
@@ -45,18 +48,30 @@ export default function CommentsPanel({ metricId }) {
 
   const addComment = async () => {
     if (!newText.trim()) return;
-    const res = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
-      {
-        method: 'POST',
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: newText.trim() })
+    
+    if (newText.length > MAX_COMMENT_LENGTH) {
+      setMessage({ type: 'error', text: `Комментарий не может быть длиннее ${MAX_COMMENT_LENGTH} символов` });
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.commentsByMetric(metricId)),
+        {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ text: newText.trim() })
+        }
+      );
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to add comment');
       }
-    );
-    if (res.ok) {
+
       const created = await res.json();
       setComments(prev => [{
         ...created,
@@ -64,23 +79,40 @@ export default function CommentsPanel({ metricId }) {
         userId: user.id
       }, ...prev]);
       setNewText('');
+      setMessage(null);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
     }
   };
 
   const saveComment = async (id, text) => {
-    const res = await fetch(
-      getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
-      {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ text: text.trim() })
+    if (text.length > MAX_COMMENT_LENGTH) {
+      setMessage({ type: 'error', text: `Комментарий не может быть длиннее ${MAX_COMMENT_LENGTH} символов` });
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        getAbsoluteURL(API_ENDPOINTS.updateComment(id)),
+        {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ text: text.trim() })
+        }
+      );
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update comment');
       }
-    );
-    if (res.ok) {
+
       const updated = await res.json();
       setComments(prev =>
         prev.map(c => c.id === id ? { ...c, text: updated.text, updatedAt: updated.updatedAt } : c)
       );
+      setMessage(null);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
     }
   };
 
@@ -132,6 +164,12 @@ export default function CommentsPanel({ metricId }) {
         </div>
       </div>
 
+      {message && (
+        <div className={`message ${message.type}`}>
+          {message.text}
+        </div>
+      )}
+
       <div className="comments-list">
         <AnimatePresence>
           {comments.map(c => (
@@ -141,6 +179,7 @@ export default function CommentsPanel({ metricId }) {
               isOwn={user && c.userId === user.id}
               onSave={saveComment}
               onDelete={deleteComment}
+              maxLength={MAX_COMMENT_LENGTH}
             />
           ))}
         </AnimatePresence>
@@ -152,18 +191,35 @@ export default function CommentsPanel({ metricId }) {
           value={newText}
           onChange={e => setNewText(e.target.value)}
           placeholder="Написать комментарий..."
+          maxLength={MAX_COMMENT_LENGTH}
         />
-        <button onClick={addComment} disabled={!newText.trim()}>
-          Отправить
-        </button>
+        <div className="comment-add-footer">
+          <span className="comment-length">
+            {newText.length}/{MAX_COMMENT_LENGTH}
+          </span>
+          <button onClick={addComment} disabled={!newText.trim()}>
+            Отправить
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function CommentItem({ comment, isOwn, onSave, onDelete }) {
+function CommentItem({ comment, isOwn, onSave, onDelete, maxLength }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(comment.text);
+  const [message, setMessage] = useState(null);
+
+  const handleSave = () => {
+    if (text.length > maxLength) {
+      setMessage({ type: 'error', text: `Комментарий не может быть длиннее ${maxLength} символов` });
+      return;
+    }
+    onSave(comment.id, text);
+    setEditing(false);
+    setMessage(null);
+  };
 
   return (
     <div className="comment-item">
@@ -180,7 +236,7 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
               </motion.span>
             )}
             {editing && (
-              <motion.span className="icon-button check-button" whileHover={{ scale: 1.2 }} onClick={() => { onSave(comment.id, text); setEditing(false); }}>
+              <motion.span className="icon-button check-button" whileHover={{ scale: 1.2 }} onClick={handleSave}>
                 <FaCheck />
               </motion.span>
             )}
@@ -191,13 +247,25 @@ function CommentItem({ comment, isOwn, onSave, onDelete }) {
         )}
       </div>
 
+      {message && (
+        <div className={`message ${message.type}`}>
+          {message.text}
+        </div>
+      )}
+
       {editing ? (
-        <textarea
-          rows={2}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          className="comment-edit-textarea"
-        />
+        <div className="comment-edit">
+          <textarea
+            rows={2}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            className="comment-edit-textarea"
+            maxLength={maxLength}
+          />
+          <div className="comment-length">
+            {text.length}/{maxLength}
+          </div>
+        </div>
       ) : (
         <p className="comment-text">{comment.text}</p>
       )}
