@@ -1,8 +1,8 @@
 // src/components/AdminPanel.js
 import React, { useEffect, useState } from 'react'
-import { useAuth }        from '../AuthContext'
+import { useAuth } from '../AuthContext'
 import { getAbsoluteURL } from '../utils/utils'
-import { API_ENDPOINTS }  from '../constants'
+import { API_ENDPOINTS } from '../constants'
 import { motion, AnimatePresence } from 'framer-motion'
 import './AdminPanel.css'
 
@@ -12,37 +12,32 @@ export default function AdminPanel() {
   const [metrics, setMetrics] = useState([])
   const [allTags, setAllTags] = useState([])
   const [filteredTags, setFilteredTags] = useState([])
-  const [users, setUsers]     = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // формы
-  const [newTagName, setNewTagName]   = useState('')
+  const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#3498db')
   const [tagError, setTagError] = useState(null)
 
-  // поисковые строки
-  const [searchTag, setSearchTag]       = useState('')
-  const [searchUser, setSearchUser]     = useState('')
+  const [searchTag, setSearchTag] = useState('')
+  const [searchUser, setSearchUser] = useState('')
   const [searchMetric, setSearchMetric] = useState('')
 
-  // Загрузка данных при монтировании
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true)
         setError(null)
 
-        // Загружаем пользователей
-        const usersRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminUsers), { 
+        const usersRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminUsers), {
           headers: getAuthHeaders()
         })
         if (!usersRes.ok) throw new Error('Failed to load users')
         const usersData = await usersRes.json()
         setUsers(usersData)
 
-        // Загружаем теги
-        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), { 
+        const tagsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.adminTags), {
           headers: getAuthHeaders()
         })
         if (!tagsRes.ok) throw new Error('Failed to load tags')
@@ -50,8 +45,7 @@ export default function AdminPanel() {
         setAllTags(tagsData)
         setFilteredTags(tagsData)
 
-        // Загружаем метрики
-        const metricsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics), { 
+        const metricsRes = await fetch(getAbsoluteURL(API_ENDPOINTS.listMetrics), {
           headers: getAuthHeaders()
         })
         if (!metricsRes.ok) throw new Error('Failed to load metrics')
@@ -66,19 +60,15 @@ export default function AdminPanel() {
     loadData()
   }, [getAuthHeaders])
 
-  // фильтрация тегов локально
   useEffect(() => {
     const query = searchTag.trim().toLowerCase()
     if (!query) {
       setFilteredTags(allTags)
     } else {
-      setFilteredTags(
-        allTags.filter(t => t.name.toLowerCase().includes(query))
-      )
+      setFilteredTags(allTags.filter(t => t.name.toLowerCase().includes(query)))
     }
   }, [searchTag, allTags])
 
-  // добавить тег
   const addTag = async () => {
     setTagError(null)
     if (!newTagName.trim()) return
@@ -107,32 +97,29 @@ export default function AdminPanel() {
     }
   }
 
-  // удалить тег
   const delTag = async id => {
-    const res = await fetch(
-      getAbsoluteURL(`${API_ENDPOINTS.adminTags}/${id}`),
-      { method: 'DELETE', headers: getAuthHeaders() }
-    )
+    const res = await fetch(getAbsoluteURL(`${API_ENDPOINTS.adminTags}/${id}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    })
     if (res.ok) {
       setAllTags(prev => prev.filter(t => t.id !== id))
       setFilteredTags(prev => prev.filter(t => t.id !== id))
     }
   }
 
-  // удалить пользователя
   const delUser = async id => {
-    const res = await fetch(
-      getAbsoluteURL(`${API_ENDPOINTS.adminUsers}/${id}`),
-      { method: 'DELETE', headers: getAuthHeaders() }
-    )
+    const res = await fetch(getAbsoluteURL(`${API_ENDPOINTS.adminUsers}/${id}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    })
     if (res.ok) setUsers(prev => prev.filter(u => u.id !== id))
   }
 
-  // привязать/отвязать тег к метрике
   const toggleMetricTag = async (metricId, tagId, hasTag) => {
     const endpoint = API_ENDPOINTS.adminMetricTags(metricId, tagId)
-    const method   = hasTag ? 'DELETE' : 'POST'
-    const res      = await fetch(getAbsoluteURL(endpoint), { method, headers: getAuthHeaders() })
+    const method = hasTag ? 'DELETE' : 'POST'
+    const res = await fetch(getAbsoluteURL(endpoint), { method, headers: getAuthHeaders() })
     if (!res.ok) return
     setMetrics(prev =>
       prev.map(m => {
@@ -218,7 +205,7 @@ export default function AdminPanel() {
             onChange={e => setSearchMetric(e.target.value)}
           />
           <ul className="admin-list metric-list">
-            {metrics.map(m => (
+            {metrics.filter(m => m.name.toLowerCase().includes(searchMetric.trim().toLowerCase())).map(m => (
               <li key={m.id} className="admin-list-item metric-item">
                 <div className="metric-info">
                   <strong className="metric-name">{m.name}</strong>
@@ -266,7 +253,7 @@ export default function AdminPanel() {
           />
           <ul className="admin-list">
             <AnimatePresence>
-              {users.map(u => (
+              {users.filter(u => u.username.toLowerCase().includes(searchUser.trim().toLowerCase())).map(u => (
                 <motion.li
                   key={u.id}
                   className="admin-list-item"
