@@ -172,8 +172,7 @@ async function sendHourlyNotifications() {
 
     // Подпись в конце отчета
     doc.fontSize(10)
-       .text('Документ сформирован автоматически', { align: 'right' })
-       .text(`Страница ${doc.bufferedPageRange().start + 1} из ${doc.bufferedPageRange().count}`, { align: 'right' });
+       .text('Документ сформирован автоматически', { align: 'right' });
 
     doc.end();
 
